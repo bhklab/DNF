@@ -3,19 +3,19 @@
 
 rm(list=ls())
 
-source('~/RCode/DRUG_SNF/preprocessInput.R')
-source('~/RCode/DRUG_SNF/sensitivityData.R')
-source('~/RCode/DRUG_SNF/perturbationData.R')
-source('~/RCode/DRUG_SNF/structureData.R')
-source('~/RCode/DRUG_SNF/constStructureLayer.R')
-source('~/RCode/DRUG_SNF/constSensitivityLayer.R')
-source('~/RCode/DRUG_SNF/constPerturbationLayer.R')
-source('~/RCode/DRUG_SNF/integrateStrctSensPert.R')
-source('~/RCode/DRUG_SNF/drugTargetBench.R')
-source('~/RCode/DRUG_SNF/generateDrugPairs.R')
-source('~/RCode/DRUG_SNF/compConcordIndx.R')
-source('~/RCode/DRUG_SNF/generateRocPlot.R')
-source('~/RCode/DRUG_SNF/predPerf.R')
+source('./RCode/DRUG_SNF/preprocessInput.R')
+source('./RCode/DRUG_SNF/sensitivityData.R')
+source('./RCode/DRUG_SNF/perturbationData.R')
+source('./RCode/DRUG_SNF/structureData.R')
+source('./RCode/DRUG_SNF/constStructureLayer.R')
+source('./RCode/DRUG_SNF/constSensitivityLayer.R')
+source('./RCode/DRUG_SNF/constPerturbationLayer.R')
+source('./RCode/DRUG_SNF/integrateStrctSensPert.R')
+source('./RCode/DRUG_SNF/drugTargetBench.R')
+source('./RCode/DRUG_SNF/generateDrugPairs.R')
+source('./RCode/DRUG_SNF/compConcordIndx.R')
+source('./RCode/DRUG_SNF/generateRocPlot.R')
+source('./RCode/DRUG_SNF/predPerf.R')
 
 
 library(PharmacoGx)
@@ -38,26 +38,30 @@ if ( ! file.exists("Output")) {
     dir.create("Output")
 }
 
+# Find common drugs between CTRPV2 and LINCS dataset
 commonDrugs <- preprocessInput(dname="ctrpv2", "lincs")
 length(commonDrugs)  ##239
 
+# Process Sensitivity, Perturbation, and Structure layers for set of common drugs
 sensData <- sensitivityData("ctrpv2", commonDrugs)
 pertData <- perturbationData("lincs", commonDrugs)
-commonDrugs <- intersect(colnames(sensData), colnames(pertData))
-length(commonDrugs) ##237
 strcData <- structureData("lincs", commonDrugs)  ## a vector
 
-sensData <- sensData[,commonDrugs,drop=F]
-sensData <- sensData[,order(colnames(sensData)),drop=F]
-
+# Re-extract common drugs (some drugs may have lost information) - can probably remove
+#commonDrugs <- intersect(colnames(sensData), colnames(pertData))
+#sensData <- sensData[,commonDrugs,drop=F]
+#sensData <- sensData[,order(colnames(sensData)),drop=F]
+##Reduce the data to the set of common drugs across the three layers
+#sensData <- sensData[,order(colnames(sensData)),drop=F] #Do we need to keep this? Do we need to order the rest?
 
 ## Get the common drugs (237) among the 3 datasets/layers
 commonDrugs <- Reduce(intersect,list(sort(names(strcData)),sort(colnames(sensData)),
                                       sort(colnames(pertData))))
-##Reduce the data to the set of common drugs across the three layers
-strcData<- strcData[commonDrugs]
-sensData <- sensData[,commonDrugs]
-pertData<- pertData[,commonDrugs]
+length(commonDrugs) ##237
+
+strcData<- strcData[commonDrugs] # 237 drugs
+sensData <- sensData[,commonDrugs] # 645 x 237 drugs
+pertData<- pertData[,commonDrugs] #978 genes x 237
 
 
 ## network layer construction and integration by SNF
@@ -67,8 +71,10 @@ pertAffMat <- constPerturbationLayer(pertData)
 integrtStrctSensPert <- integrateStrctSensPert(sensAffMat, strcAffMat, pertAffMat)
 
 ## loading and cleaning benchmark dataset
-dataBench <- drugTargetBench("ctrpv", commonDrugs) # 139
-## intersecting the layers with the benchmark 
+dataBench <- drugTargetBench("ctrpv", commonDrugs) # 139 x 139 drug-drug adjacency matrix
+
+## intersecting the SNF layers (ie, SNF adjacency matrix of each layer and the integration) with the benchmark 
+## Returns: list of 5 containing scores of drug-drug pairs for each of the layers and the integration and the benchmark
 pairs <- generateDrugPairs(dataBench, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert)
 
 ## validation: 1) compare cindices of combiantion layer vs. a single layer (e.g., structure)

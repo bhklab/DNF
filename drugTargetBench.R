@@ -74,6 +74,7 @@ drugTargetBench <- function(benchname, cdrugs) {
       listofTargs[[targName]] <- targGmt
     }
     ## filter out the targets common between more than 2 drugs
+    # (ie, remove drugs with only one target)
     commonTargs <- sapply(listofTargs, function(x) length(x) >= 2)
     GMT_TARG<- listofTargs[commonTargs]
     save(GMT_TARG, file = paste(getwd(), "/Output/", "gmt_targ_", benchname , ".RData", sep=""))
