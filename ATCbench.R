@@ -16,7 +16,7 @@
 
 ATCBench <- function(dname, cdrugs) {
   
-  if (dname=="chembl") {
+ if (dname=="chembl") {
      chembl_ATC <- read.delim("Data/chembl_drugs-15_3_18_59.txt", stringsAsFactor=F, na.strings=c("", "NA")) #10506 drugs!
      ## remove unused strings from synonyms or drug names such as ()
      sep = " \\("

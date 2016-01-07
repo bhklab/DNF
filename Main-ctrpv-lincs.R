@@ -16,6 +16,7 @@ source('./RCode/DRUG_SNF/generateDrugPairs.R')
 source('./RCode/DRUG_SNF/compConcordIndx.R')
 source('./RCode/DRUG_SNF/generateRocPlot.R')
 source('./RCode/DRUG_SNF/predPerf.R')
+source('./RCode/DRUG_SNF/ATCBench.R')
 
 
 library(PharmacoGx)
@@ -84,5 +85,23 @@ paste("c.index, structure layer only: ", res$c2$c.index)
 ## validation: 2) ROC plots
 generateRocPlot(pairs, d1Name="ctrpv2", d2Name="lincs", benchNam="drug-target")
 
+
+
+
+
+## 2- CHMEMBL -> ATC
+## loading and cleaning benchmark dataset
+cDrugs<-as.data.frame(commonDrugs)
+names(cDrugs)<-"pert_iname"
+dataBench2 <- ATCBench("chembl", cDrugs)
+
+dim(dataBench2) ##[1] 43 43
+pairs2 <- generateDrugPairs(dataBench2, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert)
+## validation: 1) compare cindices of combination layer vs. a single layer (e.g., structure)
+res2 <- compConcordIndx(pairs2, "structure")
+paste("c.index, combination of layers (integrative method): ", res2$c1$c.index)
+paste("c.index, structure layer only: ", res2$c2$c.index)
+## validation: 2) ROC plots
+generateRocPlot(pairs2, d1Name="ctrpv2", d2Name="lincs", benchNam="ATC(CHEMBL)")
 
 
