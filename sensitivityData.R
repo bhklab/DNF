@@ -39,7 +39,10 @@ sensitivityData <- function(dname, intersc) {
         all(sort(as.numeric(NCIdrugs$`NSC #`)) == sort(intersc$NSC)) #Sanity check
         subx <- PharmacoGx::subsetTo(NCI60, cells = NCIcells, drugs = NCIdrugs[,1]) #Subset the PharmacoSet to 353 compounds
         ## Summarize sensitivity. Get recomputed AUC using PharmacoGx pkg
-        NCI60Auc <- PharmacoGx::summarizeSensitivityPhenotype(subx,sensitivity.measure="auc_recomputed", summaryStat="median") 
+        #NCI60Auc <- PharmacoGx::summarizeSensitivityPhenotype(subx,sensitivity.measure="auc_recomputed", summaryStat="median") 
+        ## modified on Jan 7
+        NCI60Auc <- PharmacoGx::summarizeSensitivityProfiles(subx,sensitivity.measure="auc_recomputed",summary.stat ="median")
+        NCI60Auc <- t(NCI60Auc)
         ## Remove the columns with all NAs
         NCI60Auc <- NCI60Auc[,colSums(is.na(NCI60Auc)) < nrow(NCI60Auc)]
         ## remove the rows with all NAs 
