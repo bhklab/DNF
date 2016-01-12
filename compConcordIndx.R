@@ -21,10 +21,16 @@ compConcordIndx <- function(allPairs, singleLayerNam)
    if (singleLayerNam == "structure") {
         singleLayerCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$strcPairs[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
                                           surv.event=rep(1, nrow(allPairs$strcPairs)), method="noether")
-   }
-
-
-   r <- list(c1=integrCindex, c2=singleLayerCindex, cindex.comp(cindex1=integrCindex, cindex2=singleLayerCindex)) 
+   }else if (singleLayerNam == "perturbation") {
+     singleLayerCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$pertPairs[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
+                                                      surv.event=rep(1, nrow(allPairs$pertPairs)), method="noether")
+   } else if (singleLayerNam == "sensitivity") {
+     singleLayerCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$sensPairs[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
+                                                      surv.event=rep(1, nrow(allPairs$sensPairs)), method="noether")
+   } else { stop("Error!")}
+    
+    
+   r <- list(c1=integrCindex, c2=singleLayerCindex, comp=cindex.comp(cindex1=integrCindex, cindex2=singleLayerCindex)) 
 
    return(r)
 }
