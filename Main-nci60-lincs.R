@@ -1,5 +1,9 @@
+#Newest Version of PharmacoGx pkg:
+library(devtools)
+#devtools::install_github(repo="bhaibeka/PharmacoGx-private", ref="public", 
+#                         auth_token="3cfdf7dfa99718ac738896cb34fe3ec91d264c10", build_vignettes=FALSE)
 
-
+setwd("/Users/DeenaGendoo/Desktop/drugSNF/")
 rm(list=ls())
 
 source('./RCode/DRUG_SNF/preprocessInput.R')
@@ -16,7 +20,6 @@ source('./RCode/DRUG_SNF/generateDrugPairs.R')
 source('./RCode/DRUG_SNF/compConcordIndx.R')
 source('./RCode/DRUG_SNF/generateRocPlot.R')
 source('./RCode/DRUG_SNF/predPerf.R')
-
 
 library(PharmacoGx)  ## NOTE: requires version 1.0.6 (older NCI60 PSet)
 library(apcluster)
@@ -44,12 +47,11 @@ intersec <- cDrugs
 
 ## loading and cleaning data for the layers 
 sensData <- sensitivityData("nci60", cDrugs)
-dim(sensData)  ##[1]  48 348
+dim(sensData)  ##[1]  60 304
 pertData <- perturbationData("lincs", cDrugs)
 dim(pertData)  ##[1] 978 350
 strcData <- structureData("lincs", cDrugs)  ## a vector
 length(strcData) ## 353
-
 
 #Reduce All Matrices to lowest common set of drugs across all 3
 # Get 346 drugs now in the reduced sets

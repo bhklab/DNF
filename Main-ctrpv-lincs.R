@@ -1,5 +1,9 @@
+#Newest Version of PharmacoGx pkg:
+library(devtools)
+#devtools::install_github(repo="bhaibeka/PharmacoGx-private", ref="public", 
+#                         auth_token="3cfdf7dfa99718ac738896cb34fe3ec91d264c10", build_vignettes=FALSE)
 
-
+setwd("/Users/DeenaGendoo/Desktop/drugSNF/")
 
 rm(list=ls())
 

@@ -42,14 +42,24 @@ sensitivityData <- function(dname, intersc) {
         #NCI60Auc <- PharmacoGx::summarizeSensitivityPhenotype(subx,sensitivity.measure="auc_recomputed", summaryStat="median") 
         ## modified on Jan 7
         NCI60Auc <- PharmacoGx::summarizeSensitivityProfiles(subx,sensitivity.measure="gi50_published",summary.stat ="median")
-        NCI60Auc <- t(NCI60Auc)
+        #NCI60Auc <- t(NCI60Auc)
+        
+        ### Added on Jan8 to deal with the sd=0 for some drugs ...
+        # Excluded ALTRETAMINE,BRDK22081896,CARBARSONE,CICLACILLIN for which sd==0 in sensitivity data 
+        NCI60Auc <- data.matrix(NCI60Auc)
+        class(NCI60Auc) <- "numeric"
+        NCI60Auc <- apply(NCI60Auc,1,function(x) ifelse(!is.na(x),x,0))
+        NCI60Auc <- NCI60Auc[, ! apply(NCI60Auc , 2 , function(x) sd(x, na.rm = TRUE)==0 ) ]
+        ###
+        
+        
         ## Remove the columns with all NAs
         NCI60Auc <- NCI60Auc[,colSums(is.na(NCI60Auc)) < nrow(NCI60Auc)]
         ## remove the rows with all NAs 
         NCI60Auc <- NCI60Auc[rowSums(is.na(NCI60Auc)) < ncol(NCI60Auc),]
         colnames(NCI60Auc) <- gsub("drugid_","",colnames(NCI60Auc))
         colnames(NCI60Auc) <- intersc[match(colnames(NCI60Auc),intersc$NSC),]$pert_iname
-        class(NCI60Auc) <- "numeric"
+        #class(NCI60Auc) <- "numeric"
         dim(NCI60Auc) 
         sens <- NCI60Auc
     }
