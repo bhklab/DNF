@@ -79,23 +79,28 @@ dataBench <- drugTargetBench("ctrpv", commonDrugs) # 139 x 139 drug-drug adjacen
 ## Returns: list of 5 containing scores of drug-drug pairs for each of the layers and the integration and the benchmark
 pairs <- generateDrugPairs(dataBench, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert)
 ## validation: 1) compare cindices of combiantion layer vs. a single layer (e.g., structure)
-res <- compConcordIndx(pairs, "structure")
-paste("c.index, combination of layers (integrative method): ", res$c1$c.index)
-paste("c.index, structure layer only: ", res$c2$c.index)
+res <- compConcordIndx(pairs)
+cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res$cindxLst$integrCindex$c.index, "\n structure: ", res$cindxLst$structureLayerCindex$c.index,
+    "\n perturbation: ",  res$cindxLst$perturbationLayerCindex$c.index, "\n sensitivity: ", res$cindxLst$sensitivityLayerCindex$c.index)
+cat("p-vals from the c.index comparison of integration layer vs. \n structure: ", res$pVals$intgrStrcPVal,"\n perturbation: ", res$pVals$intgrPertPVal,
+    "\n sensitivity: ", res$pVals$intgrSensPVal)
 ## validation: 2) ROC plots
 generateRocPlot(pairs, d1Name="ctrpv2", d2Name="lincs", benchNam="drug-target")
 
+
 cDrugs<-as.data.frame(commonDrugs)
 names(cDrugs)<-"pert_iname"
-## 2- CHMEMBL -> ATC
+## 2- CHEMBL -> ATC
 ## loading and cleaning benchmark dataset
 dataBench2 <- ATCBench("chembl", cDrugs)
 dim(dataBench2) ##[1] 43 43
 pairs2 <- generateDrugPairs(dataBench2, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert)
 ## validation: 1) compare cindices of combination layer vs. a single layer (e.g., structure)
-res2 <- compConcordIndx(pairs2, "structure")
-paste("c.index, combination of layers (integrative method): ", res2$c1$c.index)
-paste("c.index, structure layer only: ", res2$c2$c.index)
+res2 <- compConcordIndx(pairs2)
+cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res2$cindxLst$integrCindex$c.index, "\n structure: ", res2$cindxLst$structureLayerCindex$c.index,
+    "\n perturbation: ",  res2$cindxLst$perturbationLayerCindex$c.index, "\n sensitivity: ", res2$cindxLst$sensitivityLayerCindex$c.index)
+cat("p-vals from the c.index comparison of integration layer vs. \n structure: ", res2$pVals$intgrStrcPVal,"\n perturbation: ", res2$pVals$intgrPertPVal,
+    "\n sensitivity: ", res2$pVals$intgrSensPVal)
 ## validation: 2) ROC plots
 generateRocPlot(pairs2, d1Name="ctrpv2", d2Name="lincs", benchNam="ATC(CHEMBL)")
 

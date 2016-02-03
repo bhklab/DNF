@@ -89,28 +89,32 @@ dim(integrtStrctSensPert)
 
 
 ## USING 3 DIFFERENT BENCHMARK SETS TO EVALUATE ###
-## 1- CHMEMBL -> DRUG-TARGET
+## 1- CHEMBL -> DRUG-TARGET
 ## loading and cleaning benchmark dataset
 dataBench1 <- drugTargetBench("chembl", commonDrugs)
 dim(dataBench1) ##[1] 72 72
 pairs1 <- generateDrugPairs(dataBench1, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert)
-## validation: 1) compare cindices of combination layer vs. a single layer (e.g., structure)
-res1 <- compConcordIndx(pairs1, "structure")
-paste("c.index, combination of layers (integrative method): ", res1$c1$c.index)
-paste("c.index, structure layer only: ", res1$c2$c.index)
+## validation: 1) compare cindices of integration layer vs. all single layers (e.g., structure, perturbation, sensitivity )
+res1 <- compConcordIndx(pairs1)
+cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res1$cindxLst$integrCindex$c.index, "\n structure: ", res1$cindxLst$structureLayerCindex$c.index,
+      "\n perturbation: ",  res1$cindxLst$perturbationLayerCindex$c.index, "\n sensitivity: ", res1$cindxLst$sensitivityLayerCindex$c.index)
+cat("p-vals from the c.index comparison of integration layer vs. \n structure: ", res1$pVals$intgrStrcPVal,"\n perturbation: ", res1$pVals$intgrPertPVal,
+            "\n sensitivity: ", res1$pVals$intgrSensPVal)
 ## validation: 2) ROC plots
 generateRocPlot(pairs1, d1Name="nci60", d2Name="lincs", benchNam="drug-target(CHEMBL)-Zscore")
 
 
-## 2- CHMEMBL -> ATC
+## 2- CHEMBL -> ATC
 ## loading and cleaning benchmark dataset
 dataBench2 <- ATCBench("chembl", cDrugs$lincsboth)
 dim(dataBench2) ##[1] 87 87
 pairs2 <- generateDrugPairs(dataBench2, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert)
 ## validation: 1) compare cindices of combination layer vs. a single layer (e.g., structure)
-res2 <- compConcordIndx(pairs2, "structure")
-paste("c.index, combination of layers (integrative method): ", res2$c1$c.index)
-paste("c.index, structure layer only: ", res2$c2$c.index)
+res2 <- compConcordIndx(pairs2)
+cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res2$cindxLst$integrCindex$c.index, "\n structure: ", res2$cindxLst$structureLayerCindex$c.index,
+    "\n perturbation: ",  res2$cindxLst$perturbationLayerCindex$c.index, "\n sensitivity: ", res2$cindxLst$sensitivityLayerCindex$c.index)
+cat("p-vals from the c.index comparison of integration layer vs. \n structure: ", res2$pVals$intgrStrcPVal,"\n perturbation: ", res2$pVals$intgrPertPVal,
+    "\n sensitivity: ", res2$pVals$intgrSensPVal)
 ## validation: 2) ROC plots
 generateRocPlot(pairs2, d1Name="nci60", d2Name="lincs", benchNam="ATC(CHEMBL)-Zscore")
 
