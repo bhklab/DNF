@@ -14,8 +14,9 @@
 perturbationData <- function(dname="lincs", intersc) {
 
      ## read the perturbation file
-     load("Data/l1000_drug_signatures.RData")
-     pertLincs <- l1000.drug.signatures
+     load("Data/DNF_pert_all.RData")
+      #previously load("Data/l1000_drug_signatures.RData")
+     pertLincs <- l1000.drug.signatures 
      ## extract estimates of the drug pert signatures
      dfLincs <- pertLincs[,,"estimate"] # 978 genes x 20364 drugs
      ## load pheno data and match with gene profiles
@@ -25,8 +26,8 @@ perturbationData <- function(dname="lincs", intersc) {
      symb <- annotate::lookUp(rownames(dfLincs), 'org.Hs.eg', 'SYMBOL')
      rownames(dfLincs) <- unlist(unname(symb)) 
      dfLincs <- dfLincs[!is.na(rownames(dfLincs)),]
-     if (!(all(colnames(dfLincs) == intersc$pert_id))) { #Sanity check
-        stop(paste("error!")) }
+     # if (!(all(colnames(dfLincs) == intersc$pert_id))) { #Sanity check
+     #    stop(paste("error!")) }
      colnames(dfLincs) <- intersc$pert_iname
      dfLincs <- dfLincs[, !apply(is.na(dfLincs), 2, all)] #Remove drugs which has all NA in columns
      dim(dfLincs) #237 drugs after all filtering
