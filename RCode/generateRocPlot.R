@@ -43,7 +43,7 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   pdf(filename, width=5, height = 5)
   par(mar=c(5,5,2,2), xaxs = "i", yaxs = "i", cex.axis=1.3, cex.lab=1.4)
   # plotting the ROC curve
-  plot(predIntegr$perf, col="black", lty=3, lwd=3)
+  plot(predIntegr$perf, col="black", lwd=2)
   plot(predStrc$perf, col="#d7191c", lwd=2,add = TRUE)
   plot(predSens$perf, col = "#41ab5d", lwd=2,add = TRUE)
   plot(predPert$perf, col = "#2b83ba", lwd=2,add = TRUE)
