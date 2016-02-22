@@ -21,6 +21,23 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   predSens <- predPerf(allPairs$sensPairs$obs.sens, allPairs$benchPairs$bench)
   predPert <- predPerf(allPairs$pertPairs$obs.pert, allPairs$benchPairs$bench)
   
+#   pred <- list(predIntegr,pred2,pred3,pred4)
+#   
+#   perfIntegr <- performance(predIntegr,"tpr","fpr")
+#   perf2 <- performance(pred2,"tpr","fpr")
+#   perf3 <- performance(pred3,"tpr","fpr")
+#   perf4 <- performance(pred4,"tpr","fpr")
+#   
+#   auc1 <- performance(predIntegr,"auc")
+#   auc1 <- unlist(slot(auc1, "y.values"))
+#   auc2 <- performance(pred2,"auc")
+#   auc2 <- unlist(slot(auc2, "y.values"))
+#   auc3 <- performance(pred3,"auc")
+#   auc3 <- unlist(slot(auc3, "y.values"))
+#   auc4 <- performance(pred4,"auc")
+#   auc4 <- unlist(slot(auc4, "y.values"))
+  
+  
   # changing params for the ROC plot - width, etc
   filename = paste(getwd(), "/Output/", "ROC_", d1Name, "_", d2Name, "_", benchName, ".pdf", sep="")
   pdf(filename, width=5, height = 5)
