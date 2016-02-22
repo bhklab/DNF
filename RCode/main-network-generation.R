@@ -22,7 +22,7 @@ colnames(cormd) <- colnames(combiall)
 rownames(cormd) <- rownames(combiall)
 
 ##### if you have forget to run the apclust object
-set.seed(12345)
+#set.seed(12345)
 apcomb <- apcluster(combi.ctrp, q=0.9)
 
 ###### names of the exemplar drugs
@@ -58,7 +58,7 @@ names(apcomb@clusters) <- exemp
 apres2 <- apcomb@clusters[order(names(apcomb@clusters))]
 ll <- unlist(lapply(apres2, function(x) length(apres2[x])))
 
-set.seed(12345)
+#set.seed(12345)
 pdf("plot_network_nci60_targchembl_exemp.pdf",height=10,width=10, useDingbats =F)
 mst.plot(g, mst.edge.col="black", vertex.color=mycols, colors="gray95",tkplot=FALSE, bg="white", v.size=ll,
          layout.function=layout.kamada.kawai,e.arrow=0, e.size=dfd$weight <= 30,v.lab =names(apres2),
