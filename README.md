@@ -7,13 +7,14 @@ Hypothesis: Better characterization of compound mechanism of action (MoA) from i
 
 Impact: Identifying mechanism for compounds with unknown MoA in early stages of drug development without the need 
 of sophisticated info (side effects or pharmacological indications...) 
-Based on method described in http://www.ncbi.nlm.nih.gov/pubmed/24464287
+
+# Based on the method described in http://www.ncbi.nlm.nih.gov/pubmed/24464287
 
 Please cite: coming soon
 
 # Reproducibility of the Analysis 
 
-The following steps will reproduce the output files (figure, tables...) mentioned in the main manuscript
+The following steps will reproduce the output files (figure, tables...) mentioned in the main manuscript.
 The script will be using data files such as:
 
 ## Files to run the scripts 
