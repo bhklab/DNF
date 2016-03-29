@@ -1,5 +1,5 @@
-# DNF (Drug Network Fusion) or CGNF (Chemogenomics Network Fusion), previously named drugSNF
-Decoding compound mechanism of action using integrative pharmacogenomics
+# DNF (Drug Network Fusion)
+===========================
 
 This project assess the utility of data integration from multiple drug information layers.
 
@@ -7,8 +7,47 @@ Hypothesis: Better characterization of compound mechanism of action (MoA) from i
 
 Impact: Identifying mechanism for compounds with unknown MoA in early stages of drug development without the need 
 of sophisticated info (side effects or pharmacological indications...) 
+Based on method described in http://www.ncbi.nlm.nih.gov/pubmed/24464287
 
+Please cite: coming soon
 
+# Reproducibility of the Analysis 
+
+The following steps will reproduce the output files (figure, tables...) mentioned in the main manuscript
+The script will be using data files such as:
+
+1. Files to run the scripts 
+
+- Drug-target (benchmark) from CHEMBL and CTRP
+- Sensitivity measurements (drugs x cell lines) from CTRPv2 and NCI-60
+- Transcriptomic data from the LINCS database http://lincs.hms.harvard.edu/ created using PharmacoGx package https://cran.r-project.org/web/packages/PharmacoGx/index.html
+
+2. Run the R scripts 
+
+* main-ctrpv-lincs.R and 
+* main-nci60-lincs.R
+
+(this will execute the following R codes):
+
+```
+preprocessInput.R 	# process the raw data, find common drugs...
+sensitivityData.R 	# remove problematic drugs and missing data
+structureData.R 	# get the structural fingerprints (extended-connectivity descriptors from RCDK)
+perturbationData.R 	# remove problematic drugs and missing data and find drug names from LINCS metadata
+constStructureLayer.R 	# Get the similarity matrix from structure (tanimoto metric)
+constSensitivityLayer.R	# Get the similarity matrix from sensitivity (pearson metric), rescale to 0-1 with function in SNF
+constPerturbationLayer.R	# Get the similarity matrix from perturbation (pearson metric), rescale to 0-1 with SNF affinitymatrix
+integrateStrctSensPert.R	# Integrate all 3 layers using SNFtools
+ATCbench.R	# ATC code gold standard benchmark from CHEMBL
+drugTargetBench.R	# Drug-target benchmarks from CHEMBL and CTRPv2
+generateDrugPairs.R	# get the pairs of drugs sharing the same target (0 or 1)
+compConcordIndx.R	# Compute concordance index between benchmark data and similarity network data
+predPerf.R	# Get the p-value between concordance indices
+generateRocPlot.R	# Generate ROC plots and AUC values
+communityGen.R	# Community clustering from apcluster package in R
+main-network-generation.R	# Network based on exemplar drugs from apcluster
+
+```
 
 # Set up the software environment
 
