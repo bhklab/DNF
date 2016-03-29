@@ -1,5 +1,6 @@
-# DNF (Drug Network Fusion)
-===========================
+# Integrative pharmacogenomics to infer large-scale drug taxonomy 
+=================================================================
+Please cite: coming soon
 
 This project assess the utility of data integration from multiple drug information layers.
 
@@ -11,7 +12,6 @@ of sophisticated info (side effects or pharmacological indications...)
 # Based on the method described in 
 http://www.ncbi.nlm.nih.gov/pubmed/24464287
 
-Please cite: coming soon
 
 # Reproducibility of the Analysis 
 
