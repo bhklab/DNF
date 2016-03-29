@@ -31,22 +31,53 @@ The script will be using data files such as:
 (this will execute the following R codes):
 
 ```
-preprocessInput.R 	# process the raw data, find common drugs...
-sensitivityData.R 	# remove problematic drugs and missing data
-structureData.R 	# get the structural fingerprints (extended-connectivity descriptors from RCDK)
-perturbationData.R 	# remove problematic drugs and missing data and find drug names from LINCS metadata
-constStructureLayer.R 	# Get the similarity matrix from structure (tanimoto metric)
-constSensitivityLayer.R	# Get the similarity matrix from sensitivity (pearson metric), rescale to 0-1 with function in SNF
-constPerturbationLayer.R	# Get the similarity matrix from perturbation (pearson metric), rescale to 0-1 with SNF affinitymatrix
-integrateStrctSensPert.R	# Integrate all 3 layers using SNFtools
-ATCbench.R	# ATC code gold standard benchmark from CHEMBL
-drugTargetBench.R	# Drug-target benchmarks from CHEMBL and CTRPv2
-generateDrugPairs.R	# get the pairs of drugs sharing the same target (0 or 1)
-compConcordIndx.R	# Compute concordance index between benchmark data and similarity network data
-predPerf.R	# Get the p-value between concordance indices
-generateRocPlot.R	# Generate ROC plots and AUC values
-communityGen.R	# Community clustering from apcluster package in R
-main-network-generation.R	# Network based on exemplar drugs from apcluster
+# process the raw data, find common drugs...
+preprocessInput.R 	
+
+# remove problematic drugs and missing data
+sensitivityData.R 	
+
+# get the structural fingerprints (extended-connectivity descriptors from RCDK)
+structureData.R 
+
+# remove problematic drugs and missing data and find drug names from LINCS metadata
+perturbationData.R 	
+
+# Get the similarity matrix from structure (tanimoto metric)
+constStructureLayer.R 	
+
+# Get the similarity matrix from sensitivity (pearson metric), rescale to 0-1 with function in SNF
+constSensitivityLayer.R	
+
+# Get the similarity matrix from perturbation (pearson metric), rescale to 0-1 with SNF affinitymatrix
+constPerturbationLayer.R
+
+# Integrate all 3 layers using SNFtools
+integrateStrctSensPert.R	
+
+# ATC code gold standard benchmark from CHEMBL
+ATCbench.R	
+
+# Drug-target benchmarks from CHEMBL and CTRPv2
+drugTargetBench.R	
+
+# get the pairs of drugs sharing the same target (0 or 1)
+generateDrugPairs.R	
+
+# Compute concordance index between benchmark data and similarity network data
+compConcordIndx.R	
+
+# Get the p-value between concordance indices
+predPerf.R	
+
+# Generate ROC plots and AUC values
+generateRocPlot.R	
+
+# Community clustering from apcluster package in R
+communityGen.R
+
+# Network based on exemplar drugs from apcluster
+main-network-generation.R	
 
 ```
 
