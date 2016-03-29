@@ -16,13 +16,13 @@ Please cite: coming soon
 The following steps will reproduce the output files (figure, tables...) mentioned in the main manuscript
 The script will be using data files such as:
 
-1. Files to run the scripts 
+## Files to run the scripts 
 
 - Drug-target (benchmark) from CHEMBL and CTRP
 - Sensitivity measurements (drugs x cell lines) from CTRPv2 and NCI-60
 - Transcriptomic data from the LINCS database http://lincs.hms.harvard.edu/ created using PharmacoGx package https://cran.r-project.org/web/packages/PharmacoGx/index.html
 
-2. Run the R scripts 
+## Run the R scripts 
 
 * main-ctrpv-lincs.R and 
 * main-nci60-lincs.R
