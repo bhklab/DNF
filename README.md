@@ -12,6 +12,7 @@ of sophisticated info (side effects or pharmacological indications...)
 
 # Set up the software environment
 
+```
 R version 3.2.1 (2015-06-18)
 Platform: x86_64-apple-darwin13.4.0 (64-bit)
 Running under: OS X 10.9.5 (Mavericks)
@@ -37,3 +38,5 @@ loaded via a namespace (and not attached):
 [25] rmeta_2.16         plotrix_3.6-1      bootstrap_2015.2   png_0.1-7          digest_0.6.9       stringi_1.0-1     
 [31] SuppDists_1.1-9.1  grid_3.2.1         tools_3.2.1        bitops_1.0-6       magrittr_1.5       cluster_2.0.3     
 [37] MASS_7.3-45        Matrix_1.2-3       downloader_0.4     iterators_1.0.8    igraph_1.0.1 
+
+```
