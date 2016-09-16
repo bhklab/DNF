@@ -28,16 +28,31 @@ compConcordIndx <- function(allPairs)
    
      sensitivityLayerCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$sensPairs[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
                                                       surv.event=rep(1, nrow(allPairs$sensPairs)), method="noether")
+     
+ ## added by laleh
+     iorioCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$iorio[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
+                                                           surv.event=rep(1, nrow(allPairs$iorio)), method="noether")
+     
+     iskarCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$iskar[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
+                                                surv.event=rep(1, nrow(allPairs$iskar)), method="noether")
+     #superPredCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$superPred[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
+      #                                          surv.event=rep(1, nrow(allPairs$superPred)), method="noether")
    
      cindxLst <- list(integrCindex=integrCindex, structureLayerCindex=structureLayerCindex, perturbationLayerCindex=perturbationLayerCindex, 
-                       sensitivityLayerCindex=sensitivityLayerCindex) 
-     
+                       sensitivityLayerCindex=sensitivityLayerCindex , iorioCindex=iorioCindex, iskarCindex=iskarCindex)
      ## perform c-index comparison and return the p-vals
      intgrStrcPVal <- cindex.comp(integrCindex, structureLayerCindex)
      intgrPertPVal <- cindex.comp(integrCindex, perturbationLayerCindex)
      intgrSensPVal <- cindex.comp(integrCindex, sensitivityLayerCindex)
-     pVals <- list(intgrStrcPVal=intgrStrcPVal$p.value, intgrPertPVal=intgrPertPVal$p.value, intgrSensPVal=intgrSensPVal$p.value)
+     intgrIorioPVal <- cindex.comp(integrCindex, iorioCindex)
+     intgrIskarPVal <- cindex.comp(integrCindex, iskarCindex)
      
+     #intgrSuperPVal <- cindex.comp(integrCindex, superPredCindex)
+     
+     
+     pVals <- list(intgrStrcPVal=intgrStrcPVal$p.value, intgrPertPVal=intgrPertPVal$p.value, 
+                   intgrSensPVal=intgrSensPVal$p.value, intgrIorioPVal=intgrIorioPVal$p.value, intgrIskarPVal=intgrIskarPVal$p.value) #, intgrSuperPVal=intgrSuperPVal$p.value)
+     #, intgrIorioPVal=intgrIorioPVal$p.value
      ## return both lists of results
      r <- list(cindxLst=cindxLst, pVals=pVals) 
 

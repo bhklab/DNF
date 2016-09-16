@@ -19,6 +19,7 @@ drugTargetBench <- function(benchname, cdrugs) {
        ctrpDrTargs <- read.csv("Data/ctrpv2_drugtarget.csv", stringsAsFactors = FALSE) # 481 drugs x 3 descriptions
        ctrpDrTargs$compound_name <- toupper(ctrpDrTargs$compound_name)
        ctrpDrTargs$compound_name <- gsub(badchars,"",ctrpDrTargs$compound_name)
+       ## 
        ctrpDrTargs <- ctrpDrTargs[ctrpDrTargs$compound_name %in% cdrugs,,drop=F] 
        ctrpDrTargs <- ctrpDrTargs[,c(1,2)] 
        colnames(ctrpDrTargs)[1:2] <- c("MOLECULE_NAME","TARGET_NAME")
@@ -30,7 +31,19 @@ drugTargetBench <- function(benchname, cdrugs) {
        ## single target categorty 
        drgTargets <- drgTargets[,c("MOLECULE_NAME","TARGET_NAME")]
 
-  } else if (benchname == "chembl") {
+  } else if (benchname == "gdsc") {
+    x <- read.csv("GDSC1000_druginfo.csv", stringsAsFactors = FALSE)
+    x$drugid <- toupper(x$drugid)
+    x$drugid <- gsub(badchars, "", x$drugid)
+    length(unique(x$drugid))
+    
+    x <- x[x$drugid %in% cdrugs,,drop=F] 
+    x <- x[,c("drugid", "TARGET")] 
+    colnames(x)[1:2] <- c("MOLECULE_NAME","TARGET_NAME")
+    drgTargets <- x
+    
+  }
+  else if (benchname == "chembl") {
        ## read CHEMBL drug file downloaded from Chembl website
        chemblDrTargs <- read.delim("Data/chembl_drugtargets-15_3_46_00.txt", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
        drgTargets <- chemblDrTargs[,c("MOLECULE_NAME", "TARGET_NAME")]
@@ -38,7 +51,6 @@ drugTargetBench <- function(benchname, cdrugs) {
        drgTargets[,1] <- gsub(badchars, "",  drgTargets[,1])
        drgTargets[,1] <- toupper(drgTargets[,1])
        drgTargets <- drgTargets[drgTargets[,1] %in% cdrugs,]
-       
 
   } else if (benchname == "stitch") {
        ## DRUG TARGETS BENCHMARKING
@@ -61,7 +73,18 @@ drugTargetBench <- function(benchname, cdrugs) {
        ## single target categorty 
        drgTargets <- stitchDrTargs[,c("MOLECULE_NAME","TARGET_NAME")] ### rename to starg, maybe to keep stitch_targets in case of error!
        #dim(drgTargets)
-   }
+       
+  } else if (benchname == "uniprot")  {
+    ## read CHEMBL drug file downloaded from Chembl website
+    chemblDrTargs <- read.csv("Data/uniprot links.csv", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
+    drgTargets <- chemblDrTargs[,c("Name", "UniProt.Name")]
+    colnames(drgTargets) <-  c("MOLECULE_NAME","TARGET_NAME")
+    ## remove badchar from Chembl and common drug file + capitalize 
+    drgTargets[,1] <- gsub(badchars, "",  drgTargets[,1])
+    drgTargets[,1] <- toupper(drgTargets[,1])
+    drgTargets <- drgTargets[drgTargets[,1] %in% cdrugs,]
+    
+  }
      
     #Number of drugs with TARGETS: length(unique(chembl_Targets.common.all$MOLECULE_NAME))
     drgTargets <- unique(drgTargets)
@@ -74,7 +97,6 @@ drugTargetBench <- function(benchname, cdrugs) {
       listofTargs[[targName]] <- targGmt
     }
     ## filter out the targets common between more than 2 drugs
-    # (ie, remove targets with only one drug)
     commonTargs <- sapply(listofTargs, function(x) length(x) >= 2)
     GMT_TARG<- listofTargs[commonTargs]
     save(GMT_TARG, file = paste(getwd(), "/Output/", "gmt_targ_", benchname , ".RData", sep=""))

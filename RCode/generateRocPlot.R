@@ -12,7 +12,6 @@
 ## 
 ###############################################################################################################
 
- 
 generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   
   
@@ -20,24 +19,12 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   predStrc <- predPerf(allPairs$strcPairs$obs.str, allPairs$benchPairs$bench)
   predSens <- predPerf(allPairs$sensPairs$obs.sens, allPairs$benchPairs$bench)
   predPert <- predPerf(allPairs$pertPairs$obs.pert, allPairs$benchPairs$bench)
+  iorio <- predPerf(allPairs$iorio$iorio, allPairs$benchPairs$bench)
+  iskar <- predPerf(allPairs$iskar$iskar, allPairs$benchPairs$bench)
   
-#   pred <- list(predIntegr,pred2,pred3,pred4)
-#   
-#   perfIntegr <- performance(predIntegr,"tpr","fpr")
-#   perf2 <- performance(pred2,"tpr","fpr")
-#   perf3 <- performance(pred3,"tpr","fpr")
-#   perf4 <- performance(pred4,"tpr","fpr")
-#   
-#   auc1 <- performance(predIntegr,"auc")
-#   auc1 <- unlist(slot(auc1, "y.values"))
-#   auc2 <- performance(pred2,"auc")
-#   auc2 <- unlist(slot(auc2, "y.values"))
-#   auc3 <- performance(pred3,"auc")
-#   auc3 <- unlist(slot(auc3, "y.values"))
-#   auc4 <- performance(pred4,"auc")
-#   auc4 <- unlist(slot(auc4, "y.values"))
-  
-  
+  if (length(allPairs)==8) {
+    super <- predPerf(allPairs$superPred$superPred, allPairs$benchPairs$bench)
+  }
   # changing params for the ROC plot - width, etc
   filename = paste(getwd(), "/Output/", "ROC_", d1Name, "_", d2Name, "_", benchName, ".pdf", sep="")
   pdf(filename, width=5, height = 5)
@@ -47,17 +34,28 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   plot(predStrc$perf, col="#d7191c", lwd=2,add = TRUE)
   plot(predSens$perf, col = "#41ab5d", lwd=2,add = TRUE)
   plot(predPert$perf, col = "#2b83ba", lwd=2,add = TRUE)
+  plot(iorio$perf, col = "pink", lwd=2,add = TRUE)
+  plot(iskar$perf, col = "purple", lwd=2,add = TRUE)
   
+  if (length(allPairs)==8) {
+    plot(super$perf, col = "cyan", lwd=2,add = TRUE)
+  }
   aucLegIntegr <- paste(c("Integration = "), round(predIntegr$auc,3), sep="")
   aucLegStr <- paste(c("Structure = "), round(predStrc$auc,3),sep="")
   aucLegSen <- paste(c("Sensitivity = "), round(predSens$auc,3) , sep="")
   aucLegPer <- paste(c("Perturbation = "), round(predPert$auc,3), sep="")
+  aucLegIorio <- paste(c("IorioPGX = "), round(iorio$auc,3), sep="")
+  aucLegIskar <- paste(c("Iskar = "), round(iskar$auc,3), sep="")
   
-  legend(0.6,0.3,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer), border="white", cex=0.75, 
-         box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba"))
+  if (length(allPairs)==8) {
+    aucLegSuper<- paste(c("SuperPred = "), round(super$auc,3), sep="")
+    legend(0.5,0.4,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer, aucLegIorio, aucLegIskar, aucLegSuper), border="white", cex=0.75, 
+           box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple", "cyan"))
+  } else {
+      legend(0.5,0.3,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer, aucLegIorio, aucLegIskar ), border="white", cex=0.75, 
+         box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple"))
+  }
+  abline(0,1, col = "gray")
   dev.off()
-  
-  
-  
   
 }
