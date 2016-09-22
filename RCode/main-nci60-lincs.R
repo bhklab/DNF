@@ -19,6 +19,7 @@ source('./RCode/generateRocPlot.R')
 source('./RCode/generatePRPlot.R')
 source('./RCode/predPerf.R')
 source('./RCode/communityGen.R')
+source('./RCode/cindexComp2.R')
 
 
 library(PharmacoGx) 
@@ -87,18 +88,22 @@ dim(pertAffMat)
 dim(integrtStrctSensPert)
 
 
+
 ## Benchmarking and validation
 ## 1- DRUG-TARGET 
 dataBench1.5 <- drugTargetBench("uniprot", commonDrugs)
 dim(dataBench1.5) ##[1] 86
-load("Data/averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
-load("Data/averageIskarFinal.RData") ##load "iskar" results here ... (see iskar.R)
+load("averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
+load("averageIskarFinal.RData") ##load "iskar" results here ... (see iskar.R)
 
 pairs1 <- generateDrugPairs(dataBench1.5, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert, average, finalIskarScore, NULL)
+
 ## compare cindices of integration layer vs. all single layers (e.g., structure, perturbation, sensitivity )
 res1 <- compConcordIndx(pairs1)
-cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res1$cindxLst$integrCindex$c.index, "\n structure: ", res1$cindxLst$structureLayerCindex$c.index,
-    "\n perturbation: ",  res1$cindxLst$perturbationLayerCindex$c.index, "\n sensitivity: ", res1$cindxLst$sensitivityLayerCindex$c.index)
+
+cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res1$cindxLst$integrCindex, "\n structure: ", res1$cindxLst$structureLayerCindex,
+    "\n perturbation: ",  res1$cindxLst$perturbationLayerCindex, "\n sensitivity: ", res1$cindxLst$sensitivityLayerCindex, "\n Iorio: ", res1$cindxLst$iorioCindex, 
+    "\n Iskar: ", res1$cindxLst$iskarCindex)
 cat("p-vals from the c.index comparison of integration layer vs. \n structure: ", res1$pVals$intgrStrcPVal,"\n perturbation: ", res1$pVals$intgrPertPVal,
     "\n sensitivity: ", res1$pVals$intgrSensPVal, "\n Iorio: ", res1$pVals$intgrIorioPVal, "\n Iskar: ", res1$pVals$intgrIskarPVal)
 ## ROC and PR plots
@@ -110,19 +115,21 @@ generatePRPlot(pairs1, d1Name="nci60", d2Name="lincs", benchNam="drug-target(UNI
 dataBench3 <- ATCBench("chembl-new", cDrugs$lincsboth)
 dim(dataBench3) ##[1] 72 72
 ##load "superPred" post-processed results here ... (see compareTo_suprPred.R)
-load("Data/SuperPredsimil-NCI60.Rdata")
-load("Data/averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
+load("SuperPredsimil-NCI60.Rdata")
+load("averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
 ##load "iskar" results here ... (see iskar.R)
-load("Data/averageIskarFinal.RData")
+load("averageIskarFinal.RData")
 
 pairs2 <- generateDrugPairs(dataBench3, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert, average, finalIskarScore, SuperPredsimil)
 
 ## compare cindices of combination layer vs. a single layer (e.g., structure)
 res2 <- compConcordIndx(pairs2)
-cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res2$cindxLst$integrCindex$c.index, "\n structure: ", res2$cindxLst$structureLayerCindex$c.index,
-    "\n perturbation: ",  res2$cindxLst$perturbationLayerCindex$c.index, "\n sensitivity: ", res2$cindxLst$sensitivityLayerCindex$c.index)
+
+cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res2$cindxLst$integrCindex, "\n structure: ", res2$cindxLst$structureLayerCindex,
+    "\n perturbation: ",  res2$cindxLst$perturbationLayerCindex, "\n sensitivity: ", res2$cindxLst$sensitivityLayerCindex, "\n Iorio: ", res2$cindxLst$iorioCindex, 
+    "\n Iskar: ", res2$cindxLst$iskarCindex, "\n superPred: ", res2$cindxLst$superPredCindex)
 cat("p-vals from the c.index comparison of integration layer vs. \n structure: ", res2$pVals$intgrStrcPVal,"\n perturbation: ", res2$pVals$intgrPertPVal,
-    "\n sensitivity: ", res2$pVals$intgrSensPVal, "\n Iorio: ", res2$pVals$intgrIorioPVal, "\n Iskar: ", res2$pVals$intgrIskarPVal)
+    "\n sensitivity: ", res2$pVals$intgrSensPVal, "\n Iorio: ", res2$pVals$intgrIorioPVal, "\n Iskar: ", res2$pVals$intgrIskarPVal, "\n superPred: ", res2$pVals$intgrSuperPVal)
 ## ROC and PR plots
 generateRocPlot(pairs2, d1Name="nci60", d2Name="lincs", benchNam="ATC(CHEMBL)-Zscore-sep16")
 generatePRPlot(pairs2, d1Name="nci60", d2Name="lincs", benchNam="ATC(CHEMBL)-Zscore-sep16")
