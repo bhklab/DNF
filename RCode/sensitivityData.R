@@ -32,6 +32,24 @@ sensitivityData <- function(dname, intersc) {
         ctrpv2Sens <- ctrpv2Sens[,colnames(ctrpv2Sens) %in% intersc$pert_iname,drop=F]
         sens <- ctrpv2Sens
         
+   } else if (dname == "gdsc") {
+        load("Data/GDSC1000_auc_published.RData") #
+        gdscSens <- t(GDSC1000_auc_pub)
+        gdscSens <- gdscSens[!duplicated(rownames(gdscSens)),,drop=F]
+        gdscSens <- as.data.frame(gdscSens)
+        ## Remove the columns with all NAs
+        gdscSens <- gdscSens[colSums(is.na(gdscSens)) < nrow(gdscSens)]
+        ## remove the rows with all NAs 
+        gdscSens <- gdscSens[rowSums(is.na(gdscSens)) < ncol(gdscSens),]
+        ## capitalize + remove badchars from colnames
+        colnames(gdscSens) <- toupper(colnames(gdscSens))
+        colnames(gdscSens) <- gsub(badchars,"",colnames(gdscSens))
+        ## keep only drugs intersecting with LINCS
+        ## NOTE jan 20
+        gdscSens <- gdscSens[,colnames(gdscSens) %in% intersc$pert_iname,drop=F]
+        sens <- gdscSens
+  
+  
     } else if (dname == "nci60") {
         NCI60Auc <- intersc[,c(2,7:ncol(intersc)),drop=F]
         ## 1st column as the rownames

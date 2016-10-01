@@ -16,31 +16,43 @@
 compConcordIndx <- function(allPairs)
 {
   
-     ## compute concordance-index for each single layer and integration vs. the benchmark
-     integrCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$integrPairs[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
-                                              surv.event=rep(1, nrow(allPairs$integrPairs)), method="noether")
-   
-     structureLayerCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$strcPairs[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
-                                          surv.event=rep(1, nrow(allPairs$strcPairs)), method="noether")
-   
-     perturbationLayerCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$pertPairs[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
-                                                      surv.event=rep(1, nrow(allPairs$pertPairs)), method="noether")
-   
-     sensitivityLayerCindex <- survcomp::concordance.index(x=1-as.numeric(allPairs$sensPairs[ , 3]), surv.time=as.numeric(allPairs$benchPairs[ , 3]), 
-                                                      surv.event=rep(1, nrow(allPairs$sensPairs)), method="noether")
-   
-     cindxLst <- list(integrCindex=integrCindex, structureLayerCindex=structureLayerCindex, perturbationLayerCindex=perturbationLayerCindex, 
-                       sensitivityLayerCindex=sensitivityLayerCindex) 
+  
+     integrCindex <- Hmisc::rcorr.cens(x=allPairs$integrPairs$obs.combiall, S=allPairs$benchPairs$bench)
+     structureLayerCindex <- Hmisc::rcorr.cens(x=allPairs$strcPairs$obs.str, S=allPairs$benchPairs$bench) 
+     perturbationLayerCindex <- Hmisc::rcorr.cens(x=allPairs$pertPairs$obs.pert, S=allPairs$benchPairs$bench)
+     sensitivityLayerCindex <- Hmisc::rcorr.cens(x=allPairs$sensPairs$obs.sens, S=allPairs$benchPairs$bench)
+     iorioCindex <- Hmisc::rcorr.cens(x=allPairs$iorioPairs$obs.iorio, S=allPairs$benchPairs$bench)  
+     iskarCindex <- Hmisc::rcorr.cens(x=allPairs$iskarPairs$obs.iskar, S=allPairs$benchPairs$bench)  
+       
+     if (length(allPairs)==8) {
+         
+         superPredCindex <- Hmisc::rcorr.cens(x=allPairs$superPairs$obs.superPred, S=allPairs$benchPairs$bench)  
+         cindxLst <- list(integrCindex=integrCindex['C Index'], structureLayerCindex=structureLayerCindex['C Index'], perturbationLayerCindex=perturbationLayerCindex['C Index'], 
+                          sensitivityLayerCindex=sensitivityLayerCindex['C Index'], iorioCindex=iorioCindex['C Index'], iskarCindex=iskarCindex['C Index'], superPredCindex=superPredCindex['C Index'])
+     } else {
+         cindxLst <- list(integrCindex=integrCindex['C Index'], structureLayerCindex=structureLayerCindex['C Index'], perturbationLayerCindex=perturbationLayerCindex['C Index'],
+                       sensitivityLayerCindex=sensitivityLayerCindex['C Index'], iorioCindex=iorioCindex['C Index'], iskarCindex=iskarCindex['C Index'])
+     }
      
      ## perform c-index comparison and return the p-vals
-     intgrStrcPVal <- cindex.comp(integrCindex, structureLayerCindex)
-     intgrPertPVal <- cindex.comp(integrCindex, perturbationLayerCindex)
-     intgrSensPVal <- cindex.comp(integrCindex, sensitivityLayerCindex)
-     pVals <- list(intgrStrcPVal=intgrStrcPVal$p.value, intgrPertPVal=intgrPertPVal$p.value, intgrSensPVal=intgrSensPVal$p.value)
+     intgrStrcPVal <- cindexComp2(integrCindex, structureLayerCindex, allPairs$integrPairs$obs.combiall, allPairs$strcPairs$obs.str)
+     intgrPertPVal <- cindexComp2(integrCindex, perturbationLayerCindex, allPairs$integrPairs$obs.combiall, allPairs$pertPairs$obs.pert)
+     intgrSensPVal <- cindexComp2(integrCindex, sensitivityLayerCindex, allPairs$integrPairs$obs.combiall, allPairs$sensPairs$obs.sens)
+     intgrIorioPVal <- cindexComp2(integrCindex, iorioCindex, allPairs$integrPairs$obs.combiall, allPairs$iorioPairs$obs.iorio)
+     intgrIskarPVal <- cindexComp2(integrCindex, iskarCindex, allPairs$integrPairs$obs.combiall, allPairs$iskarPairs$obs.iskar)
+     if (length(allPairs)==8) {
+           intgrSuperPVal <- cindexComp2(integrCindex, superPredCindex, allPairs$integrPairs$obs.combiall, allPairs$superPairs$obs.superPred)
+           pVals <- list(intgrStrcPVal=intgrStrcPVal$p.value, intgrPertPVal=intgrPertPVal$p.value,
+                         intgrSensPVal=intgrSensPVal$p.value, intgrIorioPVal=intgrIorioPVal$p.value, intgrIskarPVal=intgrIskarPVal$p.value,
+                         intgrSuperPVal=intgrSuperPVal$p.value)
+       } else {
+           pVals <- list(intgrStrcPVal=intgrStrcPVal$p.value, intgrPertPVal=intgrPertPVal$p.value,
+                     intgrSensPVal=intgrSensPVal$p.value, intgrIorioPVal=intgrIorioPVal$p.value, intgrIskarPVal=intgrIskarPVal$p.value)
+       }
+       
      
      ## return both lists of results
      r <- list(cindxLst=cindxLst, pVals=pVals) 
-
      
      
    return(r)
