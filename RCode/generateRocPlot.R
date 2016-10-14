@@ -22,9 +22,14 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   iorio <- predPerf(allPairs$iorio$iorio, allPairs$benchPairs$bench)
   iskar <- predPerf(allPairs$iskar$iskar, allPairs$benchPairs$bench)
   
-  if (length(allPairs)==8) {
-    super <- predPerf(allPairs$superPred$superPred, allPairs$benchPairs$bench)
+  if (length(allPairs)==9 & !is.null(allPairs$superPairs)) {
+      predSuper <- predPerf(allPairs$superPairs$obs.superPred, allPairs$benchPairs$bench)
   }
+  
+  if (length(allPairs)==9 & !is.null(allPairs$drugePairs)) {
+      predDrugE <- predPerf(allPairs$drugePairs$obs.drugerank, allPairs$benchPairs$bench)
+  }
+  
   # changing params for the ROC plot - width, etc
   filename = paste(getwd(), "/Output/", "ROC_", d1Name, "_", d2Name, "_", benchName, ".pdf", sep="")
   pdf(filename, width=5, height = 5)
@@ -37,9 +42,13 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   plot(iorio$perf, col = "pink", lwd=2,add = TRUE)
   plot(iskar$perf, col = "purple", lwd=2,add = TRUE)
   
-  if (length(allPairs)==8) {
-    plot(super$perf, col = "cyan", lwd=2,add = TRUE)
+  if (length(allPairs)==9 & !is.null(allPairs$superPairs)) {
+      plot(predSuper$perf, col = "orange", lwd=2,add = TRUE)
   }
+  if (length(allPairs)==9 & !is.null(allPairs$drugePairs)) {
+      plot(predDrugE$perf, col = "orange", lwd=2,add = TRUE)
+  }
+  
   aucLegIntegr <- paste(c("Integration = "), round(predIntegr$auc,3), sep="")
   aucLegStr <- paste(c("Structure = "), round(predStrc$auc,3),sep="")
   aucLegSen <- paste(c("Sensitivity = "), round(predSens$auc,3) , sep="")
@@ -47,14 +56,17 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   aucLegIorio <- paste(c("IorioPGX = "), round(iorio$auc,3), sep="")
   aucLegIskar <- paste(c("Iskar = "), round(iskar$auc,3), sep="")
   
-  if (length(allPairs)==8) {
-    aucLegSuper<- paste(c("SuperPred = "), round(super$auc,3), sep="")
-    legend(0.5,0.4,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer, aucLegIorio, aucLegIskar, aucLegSuper), border="white", cex=0.75, 
-           box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple", "cyan"))
-  } else {
-      legend(0.5,0.3,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer, aucLegIorio, aucLegIskar ), border="white", cex=0.75, 
-         box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple"))
+  if (length(allPairs)==9 & !is.null(allPairs$superPairs)) {
+      aucLegSuper<- paste(c("SuperPred = "), round(predSuper$auc,3), sep="")
+      legend(0.5,0.4,c(aucLegIntegr, aucLegIorio, aucLegIskar, aucLegSuper), border="white", cex=0.75,
+      box.col = "white",fill=c("black", "pink", "purple", "orange"))
   }
+  if (length(allPairs)==9 & !is.null(allPairs$drugePairs)) {
+      aucLegDrugE <- paste(c("DrugERank = "), round(predDrugE$auc,3), sep="")
+      legend(0.5,0.4,c(aucLegIntegr, aucLegIorio, aucLegIskar, aucLegDrugE), border="white", cex=0.75,
+      box.col = "white",fill=c("black", "pink", "purple", "orange"))
+  }
+  
   abline(0,1, col = "gray")
   dev.off()
   

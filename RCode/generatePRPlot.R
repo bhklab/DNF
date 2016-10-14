@@ -11,9 +11,13 @@ generatePRPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   iorio <- predPerf(allPairs$iorio$iorio, allPairs$benchPairs$bench, "PR")
   iskar <- predPerf(allPairs$iskar$iskar, allPairs$benchPairs$bench, "PR")
   
-  if (length(allPairs)==8) {
-   super <- predPerf(allPairs$superPred$superPred, allPairs$benchPairs$bench, "PR")
+  if (length(allPairs)==9 & !is.null(allPairs$superPairs)) {
+      super <- predPerf(allPairs$superPairs$obs.superPred, allPairs$benchPairs$bench, "PR")
   }
+  if (length(allPairs)==9 & !is.null(allPairs$drugePairs)) {
+      druge <- predPerf(allPairs$drugePairs$obs.drugerank, allPairs$benchPairs$bench, "PR")
+  }
+
   
   # changing params for the ROC plot - width, etc
   filename = paste(getwd(), "/Output/", "NEW_PR_", d1Name, "_", d2Name, "_", benchName, ".pdf", sep="")
@@ -28,9 +32,13 @@ generatePRPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   plot(iskar, col = "purple", lwd=2,add = TRUE)
   plot(predIntegr$rand, col = "gray", lwd=2,add = TRUE)
   
-  if (length(allPairs)==8) {
-    plot(super, col = "cyan", lwd=2,add = TRUE)
+  if (length(allPairs)==9 & !is.null(allPairs$superPairs)) {
+      plot(super, col = "orange", lwd=2,add = TRUE)
   }
+  if (length(allPairs)==9 & !is.null(allPairs$drugePairs)) {
+      plot(druge, col = "orange", lwd=2,add = TRUE)
+  }
+  
 
   aucLegIntegr <- paste(c("Integration = "), round(predIntegr$auc.integral,3), sep="")
   aucLegStr <- paste(c("Structure = "), round(predStrc$auc.integral,3),sep="")
@@ -41,15 +49,17 @@ generatePRPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   
   rand <- paste(c("rand = "), round(predIntegr$rand$auc.integral,3), sep="")
   
-  if (length(allPairs)==8) {
-  aucLegSuper<- paste(c("SuperPred = "), round(super$auc.integral,3), sep="")
-  legend(0.5,1,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer, aucLegIorio, aucLegIskar, aucLegSuper, rand), border="white", cex=0.75,
-         box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple", "cyan", "gray"))
-  } else {
-  legend(0.5,1,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer, aucLegIorio, aucLegIskar, rand), border="white", cex=0.75,
-         box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple", "gray"))
+  if (length(allPairs)==9 & !is.null(allPairs$superPairs)) {
+      aucLegSuper<- paste(c("SuperPred = "), round(super$auc.integral,3), sep="")
+      legend(0.5,1,c(aucLegIntegr, aucLegIorio, aucLegIskar, aucLegSuper, rand), border="white", cex=0.75,
+      box.col = "white",fill=c("black","pink", "purple", "orange", "gray"))
   }
   
+  if (length(allPairs)==9 & !is.null(allPairs$drugePairs)) {
+      aucLegDruge <- paste(c("DrugERank = "), round(druge$auc.integral,3), sep="")
+      legend(0.5,1,c(aucLegIntegr, aucLegIorio, aucLegIskar, aucLegDruge, rand), border="white", cex=0.75,
+      box.col = "white",fill=c("black", "pink", "purple", "orange", "gray"))
+  }
   
   dev.off()
   

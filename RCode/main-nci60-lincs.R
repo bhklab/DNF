@@ -95,8 +95,10 @@ dataBench1.5 <- drugTargetBench("uniprot", commonDrugs)
 dim(dataBench1.5) ##[1] 86
 load("averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
 load("averageIskarFinal.RData") ##load "iskar" results here ... (see iskar.R)
+load("drugERankSimil-nci60-kendall.Rdata")
 
-pairs1 <- generateDrugPairs(dataBench1.5, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert, average, finalIskarScore, NULL)
+
+pairs1 <- generateDrugPairs(dataBench1.5, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert, average, finalIskarScore, NULL, drugERankSimil2)
 
 ## compare cindices of integration layer vs. all single layers (e.g., structure, perturbation, sensitivity )
 res1 <- compConcordIndx(pairs1)
@@ -107,20 +109,20 @@ cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res1
 cat("p-vals from the c.index comparison of integration layer vs. \n structure: ", res1$pVals$intgrStrcPVal,"\n perturbation: ", res1$pVals$intgrPertPVal,
     "\n sensitivity: ", res1$pVals$intgrSensPVal, "\n Iorio: ", res1$pVals$intgrIorioPVal, "\n Iskar: ", res1$pVals$intgrIskarPVal)
 ## ROC and PR plots
-generateRocPlot(pairs1, d1Name="nci60", d2Name="lincs", benchNam="drug-target(UNIPROT)-sep16")
-generatePRPlot(pairs1, d1Name="nci60", d2Name="lincs", benchNam="drug-target(UNIPROT)-sep16")
+generateRocPlot(pairs1, d1Name="nci60", d2Name="lincs", benchNam="drug-target(UNIPROT)")
+generatePRPlot(pairs1, d1Name="nci60", d2Name="lincs", benchNam="drug-target(UNIPROT)")
 
 
 ## 2- ATC
 dataBench3 <- ATCBench("chembl-new", cDrugs$lincsboth)
 dim(dataBench3) ##[1] 72 72
 ##load "superPred" post-processed results here ... (see compareTo_suprPred.R)
-load("SuperPredsimil-NCI60.Rdata")
+load("superPredSimil-nci60-kendall.Rdata")
 load("averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
 ##load "iskar" results here ... (see iskar.R)
 load("averageIskarFinal.RData")
 
-pairs2 <- generateDrugPairs(dataBench3, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert, average, finalIskarScore, SuperPredsimil)
+pairs2 <- generateDrugPairs(dataBench3, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert, average, finalIskarScore, superPredSimil2, NULL)
 
 ## compare cindices of combination layer vs. a single layer (e.g., structure)
 res2 <- compConcordIndx(pairs2)
@@ -131,8 +133,8 @@ cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res2
 cat("p-vals from the c.index comparison of integration layer vs. \n structure: ", res2$pVals$intgrStrcPVal,"\n perturbation: ", res2$pVals$intgrPertPVal,
     "\n sensitivity: ", res2$pVals$intgrSensPVal, "\n Iorio: ", res2$pVals$intgrIorioPVal, "\n Iskar: ", res2$pVals$intgrIskarPVal, "\n superPred: ", res2$pVals$intgrSuperPVal)
 ## ROC and PR plots
-generateRocPlot(pairs2, d1Name="nci60", d2Name="lincs", benchNam="ATC(CHEMBL)-Zscore-sep16")
-generatePRPlot(pairs2, d1Name="nci60", d2Name="lincs", benchNam="ATC(CHEMBL)-Zscore-sep16")
+generateRocPlot(pairs2, d1Name="nci60", d2Name="lincs", benchNam="ATC(CHEMBL)-Zscore")
+generatePRPlot(pairs2, d1Name="nci60", d2Name="lincs", benchNam="ATC(CHEMBL)-Zscore")
 
 
 ## generate communities
