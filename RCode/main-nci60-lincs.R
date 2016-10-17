@@ -93,9 +93,9 @@ dim(integrtStrctSensPert)
 ## 1- DRUG-TARGET 
 dataBench1.5 <- drugTargetBench("uniprot", commonDrugs)
 dim(dataBench1.5) ##[1] 86
-load("averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
-load("averageIskarFinal.RData") ##load "iskar" results here ... (see iskar.R)
-load("drugERankSimil-nci60-kendall.Rdata")
+load("Data/averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
+load("Data/averageIskarFinal.RData") ##load "iskar" results here ... (see iskar.R)
+load("Data/drugERankSimil-nci60-kendall.Rdata")
 
 
 pairs1 <- generateDrugPairs(dataBench1.5, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert, average, finalIskarScore, NULL, drugERankSimil2)
@@ -117,10 +117,10 @@ generatePRPlot(pairs1, d1Name="nci60", d2Name="lincs", benchNam="drug-target(UNI
 dataBench3 <- ATCBench("chembl-new", cDrugs$lincsboth)
 dim(dataBench3) ##[1] 72 72
 ##load "superPred" post-processed results here ... (see compareTo_suprPred.R)
-load("superPredSimil-nci60-kendall.Rdata")
-load("averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
+load("Data/superPredSimil-nci60-kendall.Rdata")
+load("Data/averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
 ##load "iskar" results here ... (see iskar.R)
-load("averageIskarFinal.RData")
+load("Data/averageIskarFinal.RData")
 
 pairs2 <- generateDrugPairs(dataBench3, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert, average, finalIskarScore, superPredSimil2, NULL)
 

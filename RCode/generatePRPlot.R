@@ -8,8 +8,8 @@ generatePRPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   predStrc <- predPerf(allPairs$strcPairs$obs.str, allPairs$benchPairs$bench, "PR")
   predSens <- predPerf(allPairs$sensPairs$obs.sens, allPairs$benchPairs$bench, "PR")
   predPert <- predPerf(allPairs$pertPairs$obs.pert, allPairs$benchPairs$bench, "PR")
-  iorio <- predPerf(allPairs$iorio$iorio, allPairs$benchPairs$bench, "PR")
-  iskar <- predPerf(allPairs$iskar$iskar, allPairs$benchPairs$bench, "PR")
+  iorio <- predPerf(allPairs$iorioPairs$obs.iorio, allPairs$benchPairs$bench, "PR")
+  iskar <- predPerf(allPairs$iskarPairs$obs.iskar, allPairs$benchPairs$bench, "PR")
   
   if (length(allPairs)==9 & !is.null(allPairs$superPairs)) {
       super <- predPerf(allPairs$superPairs$obs.superPred, allPairs$benchPairs$bench, "PR")
@@ -50,15 +50,15 @@ generatePRPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   rand <- paste(c("rand = "), round(predIntegr$rand$auc.integral,3), sep="")
   
   if (length(allPairs)==9 & !is.null(allPairs$superPairs)) {
-      aucLegSuper<- paste(c("SuperPred = "), round(super$auc.integral,3), sep="")
-      legend(0.5,1,c(aucLegIntegr, aucLegIorio, aucLegIskar, aucLegSuper, rand), border="white", cex=0.75,
-      box.col = "white",fill=c("black","pink", "purple", "orange", "gray"))
+    aucLegSuper<- paste(c("SuperPred = "), round(super$auc.integral,3), sep="")
+    legend(0.5,1,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer, aucLegIorio, aucLegIskar, aucLegSuper, rand), border="white", cex=0.75,
+           box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple", "orange", "gray"))
   }
   
   if (length(allPairs)==9 & !is.null(allPairs$drugePairs)) {
-      aucLegDruge <- paste(c("DrugERank = "), round(druge$auc.integral,3), sep="")
-      legend(0.5,1,c(aucLegIntegr, aucLegIorio, aucLegIskar, aucLegDruge, rand), border="white", cex=0.75,
-      box.col = "white",fill=c("black", "pink", "purple", "orange", "gray"))
+    aucLegDruge <- paste(c("DrugERank = "), round(druge$auc.integral,3), sep="")
+    legend(0.5,1,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer, aucLegIorio, aucLegIskar, aucLegDruge, rand), border="white", cex=0.75,
+           box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple", "orange", "gray"))
   }
   
   dev.off()

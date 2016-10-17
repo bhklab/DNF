@@ -19,8 +19,8 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   predStrc <- predPerf(allPairs$strcPairs$obs.str, allPairs$benchPairs$bench)
   predSens <- predPerf(allPairs$sensPairs$obs.sens, allPairs$benchPairs$bench)
   predPert <- predPerf(allPairs$pertPairs$obs.pert, allPairs$benchPairs$bench)
-  iorio <- predPerf(allPairs$iorio$iorio, allPairs$benchPairs$bench)
-  iskar <- predPerf(allPairs$iskar$iskar, allPairs$benchPairs$bench)
+  iorio <- predPerf(allPairs$iorioPairs$obs.iorio, allPairs$benchPairs$bench)
+  iskar <- predPerf(allPairs$iskarPairs$obs.iskar, allPairs$benchPairs$bench)
   
   if (length(allPairs)==9 & !is.null(allPairs$superPairs)) {
       predSuper <- predPerf(allPairs$superPairs$obs.superPred, allPairs$benchPairs$bench)
@@ -56,16 +56,20 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   aucLegIorio <- paste(c("IorioPGX = "), round(iorio$auc,3), sep="")
   aucLegIskar <- paste(c("Iskar = "), round(iskar$auc,3), sep="")
   
+  rand <- paste(c("rand = "), 0.5, sep="")
+  
+  
   if (length(allPairs)==9 & !is.null(allPairs$superPairs)) {
-      aucLegSuper<- paste(c("SuperPred = "), round(predSuper$auc,3), sep="")
-      legend(0.5,0.4,c(aucLegIntegr, aucLegIorio, aucLegIskar, aucLegSuper), border="white", cex=0.75,
-      box.col = "white",fill=c("black", "pink", "purple", "orange"))
+    aucLegSuper<- paste(c("SuperPred = "), round(predSuper$auc,3), sep="")
+    legend(0.5,0.4,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer, aucLegIorio, aucLegIskar, aucLegSuper,rand), border="white", cex=0.75,
+           box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple", "orange", "gray"))
   }
   if (length(allPairs)==9 & !is.null(allPairs$drugePairs)) {
-      aucLegDrugE <- paste(c("DrugERank = "), round(predDrugE$auc,3), sep="")
-      legend(0.5,0.4,c(aucLegIntegr, aucLegIorio, aucLegIskar, aucLegDrugE), border="white", cex=0.75,
-      box.col = "white",fill=c("black", "pink", "purple", "orange"))
+    aucLegDrugE <- paste(c("DrugERank = "), round(predDrugE$auc,3), sep="")
+    legend(0.5,0.4,c(aucLegIntegr, aucLegStr, aucLegSen, aucLegPer, aucLegIorio, aucLegIskar, aucLegDrugE,rand), border="white", cex=0.75,
+           box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple", "orange", "gray"))
   }
+  
   
   abline(0,1, col = "gray")
   dev.off()

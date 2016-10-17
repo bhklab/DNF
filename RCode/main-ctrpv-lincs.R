@@ -78,9 +78,9 @@ save(integrtStrctSensPert, file="Data/ctrpv2-Integrated.RData")
 ## 1- DRUG-TARGET 
 ## loading and cleaning benchmark dataset
 dataBench <- drugTargetBench("ctrpv",  commonDrugs) # 141 x 141 drug-drug adjacency matrix --> 141
-load("averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
-load("averageIskarFinal.RData") ##load "iskar" results here ... (see iskar.R)
-load("drugERankSimil-CTRPV2-kendall.Rdata")
+load("Data/averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
+load("Data/averageIskarFinal.RData") ##load "iskar" results here ... (see iskar.R)
+load("Data/drugERankSimil-CTRPV2-kendall.Rdata")
 
 pairs <- generateDrugPairs(dataBench, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert, average, finalIskarScore, NULL, drugERankSimil2)
 
@@ -102,9 +102,9 @@ generatePRPlot(pairs, d1Name="ctrpv2", d2Name="lincs", benchNam="drug-target")
 dataBench3 <- ATCBench("chembl-new", cDrugs)
 dim(dataBench3) ##[1]  51 51
 ##load "superPred" post-processed results here ... (see compareTo_suprPred.R)
-load("superPredSimil-ctrp-kendall.Rdata")
-load("averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
-load("averageIskarFinal.RData") ##load "iskar" results here ... (see iskar.R)
+load("Data/superPredSimil-ctrp-kendall.Rdata")
+load("Data/averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
+load("Data/averageIskarFinal.RData") ##load "iskar" results here ... (see iskar.R)
 
 pairs2 <- generateDrugPairs(dataBench3, strcAffMat, sensAffMat, pertAffMat, integrtStrctSensPert, average, finalIskarScore, superPredSimil2, NULL)
 
