@@ -1,19 +1,19 @@
 # Deena M.A. Gendoo
 # Determining Community Enrichment for DNF communities, against Drug Targets and ATC classes. 
 
-
-# integrtStrctSensPert - DNFmatrix
-# GMT_TARG - GMT
-
 library(pheatmap)
-library(apcluster)
+library(xlsx)
 
-### Load DNF datasets
-A=load("old_ctrpv2-Integrated.RData")
+### Load DNF communities
+A=load("CTRPv2comm.RData")
 CTRP_DNF = get(A)
 
-B=load("old_nci60-Integrated.RData")
+B=load("NCI60comm.RData")
 NCI60_DNF = get(B)
+
+#Sanity Check
+length(CTRP_DNF)  #should be 53
+length(NCI60_DNF) #should be 51
 
 ### Load Benchmarks for Drug Targets
 # CTRP - Internal benchmark (unchanged from previous iteration)
@@ -38,32 +38,27 @@ k=load("gmt_atc_chembl-new_NCI60.RData")
 NCI60_GMT_ATC = get(k)
 
 ### THE FUNCTION!
-communityEnrichment <- function(DNFmatrix, DrugDNFName,BenchmarkName, GMT) {
+communityEnrichment <- function(DNFcomm, DrugDNFName,BenchmarkName, GMT) {
 
   HypergeomCalculations<-list()
   
   #Generate a list of drug communities from AP Clustering
-  apcomb <- apcluster(DNFmatrix, q=0.9)
   DrugClusters <- list()
-  for(i in 1:length(apcomb)){
-    xx <- names(apcomb[[i]])
+  for(i in 1:length(DNFcomm)){
+    xx <- names(DNFcomm[[i]])
     DrugClusters[[i]] <- xx
   }
   #Add community numbers to the AP clusters
-  names(DrugClusters)<-paste("Community_",rep(1:length(DrugClusters)),sep="")
+  names(DrugClusters)<-paste("C",rep(1:length(DrugClusters)),sep="")
   #Number of drugs per community
   indx <- sapply(DrugClusters, length)
 
-  #Rename Gene lists of the Drug Targets GMT file
-  if(BenchmarkName=="ATC"){names(GMT) <- paste("ATC",unlist(names(GMT)),sep="_")}
-  if(BenchmarkName=="Target"){names(GMT) <- paste("Target",unlist(names(GMT)),sep="_")}
-  
   #Check if the genesets from the Drug Clusters intersect with the drugs in the GMT
   # If not, filter out the non-intersecting drug communities
-  ClusterList <-apcomb@clusters
-  names(ClusterList)<-paste("Community_",rep(1:length(apcomb@clusters)),sep="")
+  ClusterList <-DNFcomm@clusters
+  names(ClusterList)<-paste("C",rep(1:length(DNFcomm@clusters)),sep="")
   
-  Bkrd_Drugs<-length((unique(rownames(DNFmatrix))))
+  Bkrd_Drugs<-length((unique(rownames(DNFcomm))))
   Bkrd_Benchmark<- length(unique(c(as.character(unlist(GMT))))) #All the drugs in the GMT benchmark, N=141
   Bkrd_Benchmark_Drugs<- unique(c(as.character(unlist(GMT)))) #All the drugs in the GMT benchmark, N=141  
   
@@ -101,6 +96,7 @@ communityEnrichment <- function(DNFmatrix, DrugDNFName,BenchmarkName, GMT) {
   EnrichmentMatrix[is.na(EnrichmentMatrix)]<-1
   # Do a correction for multiple testing
   EnrichmentMatrix_FDRcorrected<-apply(EnrichmentMatrix,1,p.adjust,method="fdr")
+  write.xlsx(EnrichmentMatrix_FDRcorrected,file=paste("EnrichmentMatrix_FDRcorrected_",DrugDNFName,"_",BenchmarkName,".xls",sep=""))
   
   # Find out how many communities have at least one calculated p-value
   # (ie, how many communities have calculations on thems)
@@ -108,29 +104,26 @@ communityEnrichment <- function(DNFmatrix, DrugDNFName,BenchmarkName, GMT) {
   EnrichmentMatrix_FDRcorrected<-EnrichmentMatrix_FDRcorrected[,!apply(EnrichmentMatrix_FDRcorrected,2,function(x){all(x==1)})]
   dim(EnrichmentMatrix_FDRcorrected) #rows=targets, columns = communities
   
-  # FYI: -log10(0.01)=2
+  #Final Cleanup for publication
+  gsub(rownames(EnrichmentMatrix_FDRcorrected),pattern = "Target_",replacement = "")
+  gsub(rownames(EnrichmentMatrix_FDRcorrected),pattern = "ATC_",replacement = "")
+
+  # Use only a few color codes: FDR < 0.05; FDR < 0.01; FDR < 0.001
+  # FYI: -log10(0.01)=2 and -log10(0.1)=1 . Ergo, higher number is more significant here!
   pdf(paste("Community_Enrichment_",DrugDNFName,"_",BenchmarkName,".pdf",sep = ""),width = 12,height = 10,onefile=FALSE)
   pheatmap(-log10(t(EnrichmentMatrix_FDRcorrected)),cluster_rows = F,cluster_cols = F,
            color = c('#ffffff',rev(c('#9e0142','#d53e4f','#f46d43','#fdae61','#fee08b','#ffffbf','#e6f598','#abdda4','#66c2a5','#3288bd','#5e4fa2')))) #higher number = more significant
-  
-  dev.off()
+    dev.off()
 } 
 
 ### GENERATE PLOTS
 
 #CTRPv2 with Internal Drug Target Benchmark
-communityEnrichment(DNFmatrix = CTRP_DNF,GMT = CTRP_GMT_TARG,DrugDNFName = "CTRP",BenchmarkName = "Target")
+communityEnrichment(DNFcomm = CTRP_DNF,GMT = CTRP_GMT_TARG,DrugDNFName = "CTRP",BenchmarkName = "Target")
 #NCI60 with Drug Target Benchmark (Chembl)
-communityEnrichment(DNFmatrix = NCI60_DNF,GMT = NCI60_GMT_TARG,DrugDNFName = "NCI60",BenchmarkName = "Target")
+communityEnrichment(DNFcomm = NCI60_DNF,GMT = NCI60_GMT_TARG,DrugDNFName = "NCI60",BenchmarkName = "Target")
 
 # CTRP with ATC Benchmark (Chembl)
-communityEnrichment(DNFmatrix = CTRP_DNF,GMT = CTRP_GMT_ATC,DrugDNFName = "CTRP",BenchmarkName = "ATC")
+communityEnrichment(DNFcomm = CTRP_DNF,GMT = CTRP_GMT_ATC,DrugDNFName = "CTRP",BenchmarkName = "ATC")
 # NCI60 with ATC Benchmark (Chembl)
-communityEnrichment(DNFmatrix = NCI60_DNF,GMT = NCI60_GMT_ATC,DrugDNFName = "NCI60",BenchmarkName = "ATC")
-
-
-#pheatmap(EnrichmentMatrix,cluster_rows = F,cluster_cols = F,
-#         color = rev(c("#ffffff","#fff7f3","#fde0dd","#fcc5c0","#fa9fb5","#f768a1","#dd3497","#ae017e","#7a0177","#49006a")))
-
-#pheatmap(-log10(t(EnrichmentMatrix_FDRcorrected)),cluster_rows = F,cluster_cols = F,
-#         color = colorRampPalette(c("white","white","blue", "skyblue", "skyblue", "yellow", "yellow", "yellow", "yellow", "orange", "orange", "orange", "red", "darkred"))(length(seq(-0.4,1,by=0.01))-1))
+communityEnrichment(DNFcomm = NCI60_DNF,GMT = NCI60_GMT_ATC,DrugDNFName = "NCI60",BenchmarkName = "ATC")
