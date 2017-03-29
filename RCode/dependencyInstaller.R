@@ -1,6 +1,6 @@
 source("https://bioconductor.org/biocLite.R")
 
-list.of.CRAN.packages <- c("reshape2", "apcluster", "rcdk", "fingerprint", "SNFtool", "ROCR", "proxy", "PRROC")
+list.of.CRAN.packages <- c("reshape2", "apcluster", "rcdk", "fingerprint", "SNFtool", "ROCR", "proxy", "PRROC", "Hmisc")
 new.CRAN.packages <- list.of.CRAN.packages[!(list.of.CRAN.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.CRAN.packages, repos='http://cran.utstat.utoronto.ca/', dependencies = TRUE, clean = TRUE, Ncpus = 2, verbose = TRUE, quiet = TRUE)
 
