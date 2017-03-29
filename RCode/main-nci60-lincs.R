@@ -138,7 +138,9 @@ generatePRPlot(pairs2, d1Name="nci60", d2Name="lincs", benchNam="ATC(CHEMBL)-Zsc
 
 
 ## generate communities
-load("./RCode/CommunityEnrichment/gmt_targ_chembl-new_NCI60.RData")
+
+gmt_targ_temp <- drugTargetBench("chembl", commonDrugs)
+load("./Output/gmt_targ_chembl.RData")
 communityGen(integrtStrctSensPert, "nci60", GMT_TARG)
 
 
