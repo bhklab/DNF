@@ -138,7 +138,7 @@ generatePRPlot(pairs2, d1Name="nci60", d2Name="lincs", benchNam="ATC(CHEMBL)-Zsc
 
 
 ## generate communities
-load("Output/gmt_targ_chembl.RData")
+load("./RCode/CommunityEnrichment/gmt_targ_chembl-new_NCI60.RData")
 communityGen(integrtStrctSensPert, "nci60", GMT_TARG)
 
 
