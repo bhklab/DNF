@@ -93,3 +93,5 @@ docker pull gosuzombie/dnf
 #run image in interactive command line 
 docker run -it gosuzombie/dnf
 ```
+
+Alternatively, one can setup the Docker environment by using the provided Dockerfile. Instructions can be found [here](https://docs.docker.com/engine/getstarted/step_four/) 
