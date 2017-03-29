@@ -17,7 +17,7 @@ source('./RCode/compConcordIndx.R')
 source('./RCode/generateRocPlot.R')
 source('./RCode/generatePRPlot.R')
 source('./RCode/predPerf.R')
-source('./RCode/ATCBench.R')
+source('./RCode/ATCbench.R')
 source('./RCode/communityGen.R')
 source('./RCode/cindexComp2.R')
 
