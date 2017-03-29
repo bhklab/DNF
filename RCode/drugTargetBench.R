@@ -45,7 +45,7 @@ drugTargetBench <- function(benchname, cdrugs) {
   }
   else if (benchname == "chembl") {
        ## read CHEMBL drug file downloaded from Chembl website
-       chemblDrTargs <- read.delim("Data/chembl_drugtargets-15_3_46_00.txt", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
+       chemblDrTargs <- read.delim("Data/chembl_drugtargets-16_5_10_02.txt", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
        drgTargets <- chemblDrTargs[,c("MOLECULE_NAME", "TARGET_NAME")]
        ## remove badchar from Chembl and common drug file + capitalize 
        drgTargets[,1] <- gsub(badchars, "",  drgTargets[,1])
