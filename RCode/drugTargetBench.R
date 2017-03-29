@@ -16,7 +16,7 @@ drugTargetBench <- function(benchname, cdrugs) {
   
   if (benchname == "ctrpv") {
        # DRUG TARGETS BENCHMARKING FROM CTRPV2
-       ctrpDrTargs <- read.csv("Data/ctrpv2_drugtarget.csv", stringsAsFactors = FALSE) # 481 drugs x 3 descriptions
+       ctrpDrTargs <- read.csv("./Data/ctrpv2_drugtarget.csv", stringsAsFactors = FALSE) # 481 drugs x 3 descriptions
        ctrpDrTargs$compound_name <- toupper(ctrpDrTargs$compound_name)
        ctrpDrTargs$compound_name <- gsub(badchars,"",ctrpDrTargs$compound_name)
        ## 
@@ -32,7 +32,7 @@ drugTargetBench <- function(benchname, cdrugs) {
        drgTargets <- drgTargets[,c("MOLECULE_NAME","TARGET_NAME")]
 
   } else if (benchname == "gdsc") {
-    x <- read.csv("GDSC1000_druginfo.csv", stringsAsFactors = FALSE)
+    x <- read.csv("./Data/GDSC1000_druginfo.csv", stringsAsFactors = FALSE)
     x$drugid <- toupper(x$drugid)
     x$drugid <- gsub(badchars, "", x$drugid)
     length(unique(x$drugid))
@@ -76,7 +76,7 @@ drugTargetBench <- function(benchname, cdrugs) {
        
   } else if (benchname == "uniprot")  {
     ## read CHEMBL drug file downloaded from Chembl website
-    chemblDrTargs <- read.csv("Data/uniprot links.csv", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
+    chemblDrTargs <- read.csv("./Data/uniprot links.csv", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
     drgTargets <- chemblDrTargs[,c("Name", "UniProt.Name")]
     colnames(drgTargets) <-  c("MOLECULE_NAME","TARGET_NAME")
     ## remove badchar from Chembl and common drug file + capitalize 
