@@ -16,7 +16,7 @@ drugTargetBench <- function(benchname, cdrugs) {
   
   if (benchname == "ctrpv") {
        # DRUG TARGETS BENCHMARKING FROM CTRPV2
-       ctrpDrTargs <- read.csv("./Data/ctrpv2_drugtarget.csv", stringsAsFactors = FALSE) # 481 drugs x 3 descriptions
+       ctrpDrTargs <- read.csv("./Data/CTRPv2_drugtarget.csv", stringsAsFactors = FALSE) # 481 drugs x 3 descriptions
        ctrpDrTargs$compound_name <- toupper(ctrpDrTargs$compound_name)
        ctrpDrTargs$compound_name <- gsub(badchars,"",ctrpDrTargs$compound_name)
        ## 
