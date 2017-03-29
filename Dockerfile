@@ -16,6 +16,10 @@ RUN yum clean all
 
 RUN yum -y update
 
+RUN yum install -y libxml2-devel.x86_64 libcurl-devel 
+
+RUN yum install -y libpng-devel.x86_64
+
 RUN git clone https://github.com/gosuzombie/DNF
 
 RUN Rscript ./DNF/RCode/dependencyInstaller.R
