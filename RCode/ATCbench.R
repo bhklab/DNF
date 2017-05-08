@@ -97,7 +97,7 @@ ATCBench <- function(dname, cdrugs) {
      ## keep categories with length >= 2 drugs AND create final GMT file
      commonChemb <- sapply(listofCodes, function(x) length(x) >= 2)
      GMT_ATC <- listofCodes[commonChemb]
-     length(commonChemb) ## 144
+     length(commonChemb) ## 144, actually looks like it's 41
      
      ## data frame with 0/1
      dataWide <- reshape2::dcast(uniAtc, ATC_CODE ~ MOLECULE_NAME)

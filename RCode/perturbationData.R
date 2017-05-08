@@ -18,7 +18,7 @@ perturbationData <- function(dname="lincs", intersc, name) {
      pertLincs <- l1000.drug.signatures
   
       ## extract estimates of the drug pert signatures
-     dfLincs <- pertLincs[,,"estimate"] # 978 genes x 20364 drugs
+     dfLincs <- pertLincs[,,"estimate"] # 978 genes x 20364 drugs. Actually looks like it's 978 genes x 414 drugs
      ## load pheno data and match with gene profiles
      dfLincs <- dfLincs[, match(intersc$pert_id,colnames(dfLincs))] #239 drugs
      ## genes symbol replacement from genids
@@ -30,7 +30,7 @@ perturbationData <- function(dname="lincs", intersc, name) {
       #  stop(paste("error!")) }
      colnames(dfLincs) <- intersc$pert_iname
      dfLincs <- dfLincs[, !apply(is.na(dfLincs), 2, all)] #Remove drugs which has all NA in columns
-     dim(dfLincs) #237 drugs after all filtering
+     dim(dfLincs) #237 drugs after all filtering. ACtually looks like it's 239
      dfLincs <- dfLincs[, order(colnames(dfLincs)),drop=F]
 
      return(dfLincs)
