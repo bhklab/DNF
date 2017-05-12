@@ -61,7 +61,7 @@ sensitivityData <- function(dname, intersc) {
         dim(NCI60Auc)
         sens <- NCI60Auc
     } else if (dname == "combined") {
-        combinedSens <- readRDS('Data/combined_sens.RData')
+        combinedSens <- readRDS('Data/combined_sens_datasets_with.RData')
         combinedSens <- combinedSens[!duplicated(rownames(combinedSens)), , drop=FALSE]
         combinedSens <- combinedSens[rownames(combinedSens) %in% intersc$pert_iname , colnames(combinedSens) %in% intersc$pert_iname,drop=F]
         sens <- combinedSens

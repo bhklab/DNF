@@ -6,12 +6,47 @@ create_aucs_all <- function(datasets, drugs, cell_lines, badchars) {
         ### Clean up drug names the same way they're being cleaned in the DNF code. By doing this here
         ### we end up with drug rownames and colnames remaining in sorted order. Otherwise if we did this step
         ### in the DNF code, it might result in names that are out of order
+        old_names <- rownames(aucs)
+        old_names <-  toupper(old_names)
+        old_names <- gsub(badchars, "", old_names)
+        corrected_names <- replace_drug_names(rownames(aucs), pSetName(datasets[[i]]))
+        rownames(aucs) <- corrected_names
         rownames(aucs) <- toupper(rownames(aucs))
         rownames(aucs) <- gsub(badchars, "", rownames(aucs))
+        
+        index_names <- paste(pSetName(datasets[[i]]), old_names, sep=":::")
+        rownames(aucs.all)[which(rownames(aucs.all) %in% index_names)] <- paste(pSetName(datasets[[i]]), rownames(aucs), sep=":::")
         aucs.all[paste(pSetName(datasets[[i]]), rownames(aucs), sep=":::"), colnames(aucs)] <- aucs
     }
     
     aucs.all
+}
+
+replace_drug_names <- function(drug_names, dataset) {
+    if (dataset == "FIMM") {
+        return(drug_names)
+    }
+    
+    if (dataset == "gSCI") {
+        dataset = "gCSI"
+    }
+    
+    mappingTable <- read.csv("./Data/drugs_with_ids.csv", header=TRUE, stringsAsFactors = FALSE)
+    corrected_names <- drug_names
+    
+    for (i in 1:length(drug_names)) {
+        d_name = drug_names[i]
+        relevant_row <- mappingTable[which(mappingTable[,"unique.drugid"] == d_name),]
+        
+        replace_value <- relevant_row[1, paste(dataset, "drugid", sep = ".")]
+        
+        if (!is.na(replace_value)) {
+            corrected_names[i] <- replace_value        
+        }
+    }
+    
+    corrected_names
+    
 }
 
 ### 

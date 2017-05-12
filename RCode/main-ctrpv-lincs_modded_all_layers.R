@@ -14,13 +14,10 @@ source('./RCode/constSensitivityLayerCombined.R')
 source('./RCode/constPerturbationLayer.R')
 source('./RCode/integrateStrctSensPert.R')
 source('./RCode/drugTargetBench.R')
-source('./RCode/drugTargetBenchCombined.R')
+source('./RCode/drugTargetBenchAll.R')
 source('./RCode/generateDrugPairs.R')
-source('./RCode/generateDrugPairsCombined.R')
 source('./RCode/compConcordIndx.R')
-source('./RCode/compConcordIndxCombined.R')
 source('./RCode/generateRocPlot.R')
-source('./RCode/generateRocPlotCombined.R')
 source('./RCode/generatePRPlot.R')
 source('./RCode/predPerf.R')
 source('./RCode/ATCbench.R')
@@ -100,12 +97,12 @@ res <- compConcordIndx(pairs)
 cat("c.indexes values from each layer vs. the benchmark: \n integration: ", res$cindxLst$integrCindex, "\n structure: ", res$cindxLst$structureLayerCindex,
     "\n perturbation: ",  res$cindxLst$perturbationLayerCindex, "\n sensitivity: ", res$cindxLst$sensitivityLayerCindex, "\n Iorio: ", res$cindxLst$iorioCindex, 
     "\n Iskar: ", res$cindxLst$iskarCindex)
-dicat("p-vals from the c.index comparison of integration layer vs. \n structure: ", res$pVals$intgrStrcPVal,"\n perturbation: ", res$pVals$intgrPertPVal,
+cat("p-vals from the c.index comparison of integration layer vs. \n structure: ", res$pVals$intgrStrcPVal,"\n perturbation: ", res$pVals$intgrPertPVal,
     "\n sensitivity: ", res$pVals$intgrSensPVal, "\n Iorio: ", res$pVals$intgrIorioPVal, "\n Iskar: ", res$pVals$intgrIskarPVal)
 
 ## ROC and PR plots
 #generateRocPlot(pairs, d1Name="ctrpv2", d2Name="lincs", benchNam="drug-target")
-generateRocPlotCombined(pairs, d1Name="ctrpv2", d2Name="lincs", benchNam="drug-target")
+generateRocPlot(pairs, d1Name="ctrpv2", d2Name="lincs", benchNam="drug-target")
 generatePRPlot(pairs, d1Name="ctrpv2", d2Name="lincs", benchNam="drug-target")
 
 ## 2- ATC

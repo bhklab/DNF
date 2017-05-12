@@ -93,7 +93,7 @@ preprocessInput <- function(dname , d2="lincs") {
 
           intrsct <- list(lincsboth=lincsboth, nciboth=nciboth)
  } else if (dname == 'combined') {
-     combined <- readRDS('Data/combined_sens.RData')
+     combined <- readRDS('Data/combined_sens_datasets_with.RData')
      
      #rownames(combined) <- toupper(rownames(combined))
      #rownames(combined) <- gsub(badchars,"",rownames(combined))
@@ -106,7 +106,6 @@ preprocessInput <- function(dname , d2="lincs") {
      length(lincsInters)
      lincsInters <- lincsInters[!duplicated(lincsInters$pert_iname),,drop=F]
      
-     saveRDS(combined, 'Data/combined_sens.RData')
      View(combined)
      intrsct <- lincsInters
  }

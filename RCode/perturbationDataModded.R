@@ -15,7 +15,8 @@ perturbationDataModded <- function(dname="lincs", intersc, name) {
     
     ## read the perturbation file
     load("Data/L1000_compound_signatures.RData")
-    pertLincs <- l1000.drug.signatures
+    #pertLincs <- l1000.drug.signatures
+    pertLincs <- L1000_compounds.perturbation
     
     ## extract estimates of the drug pert signatures
     dfLincs <- pertLincs[,,"estimate"] # 978 genes x 20364 drugs. Actually looks like it's 978 genes x 414 drugs
