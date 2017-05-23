@@ -2,7 +2,6 @@
 ## Function reads in the perturbation data, processes/filters according to the intersection subset provided in the preprocess stage
 ##
 ## input: 
-##     dname: currently must be set to "lincs"  
 ##     intersc: a vector of "character" (for "ctrpv2") or dataframe (for "nci60") containting intersection info.
 ## output: 
 ##     perturbation data ("dataframe") 	
@@ -11,10 +10,10 @@
 ###############################################################################################################
 
 
-perturbationDataModded <- function(dname="lincs", intersc, name) {
+perturbationDataModded <- function(pert.file.name, intersc) {
     
     ## read the perturbation file
-    load("Data/L1000_compound_signatures.RData")
+    load(pert.file.name)
     #pertLincs <- l1000.drug.signatures
     pertLincs <- L1000_compounds.perturbation
     

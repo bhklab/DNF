@@ -21,9 +21,37 @@ compConcordIndxModded <- function(allPairs)
     sensitivityLayerCindex <- Hmisc::rcorr.cens(x=allPairs$sensPairs$obs.sens, S=allPairs$benchPairs$bench)
     
     
-    cindxLst <- list(integrCindex=integrCindex['C Index'], structureLayerCindex=structureLayerCindex['C Index'], perturbationLayerCindex=perturbationLayerCindex['C Index'],
-                     sensitivityLayerCindex=sensitivityLayerCindex['C Index'])
-
+    luminexLayerCindex <- NULL
+    imagingLayerCindex <- NULL
+    
+    intgrLuminexPVal <- NULL
+    intgrImagingPVal <- NULL
+    
+    if (!is.null(allPairs$luminexPairs$obs.luminex) && !is.null(allPairs$imagingPairs$obs.imaging)) {
+        luminexLayerCindex <- Hmisc::rcorr.cens(x=allPairs$luminexPairs$obs.luminex, S=allPairs$benchPairs$bench)
+        imagingLayerCindex <- Hmisc::rcorr.cens(x=allPairs$imagingPairs$obs.imaging, S=allPairs$benchPairs$bench)
+        
+        intgrLuminexPVal <- cindexComp2(integrCindex, luminexLayerCindex, allPairs$integrPairs$obs.combiall,
+                                        allPairs$luminexPairs$obs.luminex)
+        intgrImagingPVal <- cindexComp2(integrCindex, imagingLayerCindex, allPairs$integrPairs$obs.combiall,
+                                        allPairs$imagingPairs$obs.imaging)
+    } else if (!is.null(allPairs$luminexPairs$obs.luminex) && is.null(allPairs$imagingPairs$obs.imaging)) {
+        luminexLayerCindex <- Hmisc::rcorr.cens(x=allPairs$luminexPairs$obs.luminex, S=allPairs$benchPairs$bench)
+        
+        intgrLuminexPVal <- cindexComp2(integrCindex, luminexLayerCindex, allPairs$integrPairs$obs.combiall,
+                                        allPairs$luminexPairs$obs.luminex)
+    } else if (!is.null(allPairs$imagingPairs$obs.imaging) && is.null(allPairs$luminexPairs$obs.luminex)) {
+        imagingLayerCindex <- Hmisc::rcorr.cens(x=allPairs$imagingPairs$obs.imaging, S=allPairs$benchPairs$bench)
+        
+        intgrImagingPVal <- cindexComp2(integrCindex, imagingLayerCindex, allPairs$integrPairs$obs.combiall,
+                                        allPairs$imagingPairs$obs.imaging)
+    }
+    
+    cindxLst <- list(integrCindex=integrCindex['C Index'], structureLayerCindex=structureLayerCindex['C Index'], 
+                     perturbationLayerCindex=perturbationLayerCindex['C Index'],
+                     sensitivityLayerCindex=sensitivityLayerCindex['C Index'],
+                     luminexLayerCindex=luminexLayerCindex['C Index'],
+                     imagingLayerCindex=imagingLayerCindex['C Index'])
     
     ## perform c-index comparison and return the p-vals
     intgrStrcPVal <- cindexComp2(integrCindex, structureLayerCindex, allPairs$integrPairs$obs.combiall, allPairs$strcPairs$obs.str)
@@ -32,7 +60,8 @@ compConcordIndxModded <- function(allPairs)
     
     
     pVals <- list(intgrStrcPVal=intgrStrcPVal$p.value, intgrPertPVal=intgrPertPVal$p.value,
-                  intgrSensPVal=intgrSensPVal$p.value)
+                  intgrSensPVal=intgrSensPVal$p.value, intgrLuminexPVal=intgrLuminexPVal$p.value,
+                  intgrImagingPVal=intgrImagingPVal$p.value)
 
     
     

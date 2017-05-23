@@ -8,9 +8,9 @@ badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]
 luminex_drugs <- luminex_meta$name
 luminex_drugs <- toupper(luminex_drugs)
 luminex_drugs <- gsub(badchars, "", luminex_drugs)
-luminex_drugs <- luminex_drugs[!duplicated(luminex_drugs)]
 
-luminex_drug_names <- luminex_meta[which(luminex_drugs %in% colnames(old_data)), c("BROAD_ID", "name")]
+luminex_drug_names <- luminex_meta[luminex_drugs %in% colnames(old_data), c("BROAD_ID", "name")]
+luminex_drug_names <- luminex_drug_names[!duplicated(luminex_drug_names$name),]
 luminex_subsetted <- luminex[which(luminex$BROAD_ID %in% luminex_drug_names$BROAD_ID),]
 luminex_subsetted <- luminex_subsetted[!duplicated(luminex_subsetted$BROAD_ID),]
 

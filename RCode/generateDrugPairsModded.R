@@ -16,7 +16,7 @@
 ## 
 ###############################################################################################################
 
-generateDrugPairsModded <- function(benchDat, strcAff, sensAff, pertAff, integration) {
+generateDrugPairsModded <- function(benchDat, strcAff, sensAff, pertAff, integration, luminexAff=NULL, imagingAff=NULL) {
     
     
     ## intersection of the bechmark set and the network layers
@@ -29,6 +29,16 @@ generateDrugPairsModded <- function(benchDat, strcAff, sensAff, pertAff, integra
     dataPert[upper.tri(dataPert, diag=TRUE)] <- NA
     dataIntegrAll <- integration[intx,intx]
     dataIntegrAll[upper.tri(dataIntegrAll, diag=TRUE)] <- NA
+    
+    if (!is.null(luminexAff)) {
+        dataLuminex <- luminexAff[intx, intx]
+        dataLuminex[upper.tri(dataLuminex, diag=TRUE)] <- NA
+    }
+    
+    if (!is.null(imagingAff)) {
+        dataImaging <- imagingAff[intx, intx]
+        dataImaging[upper.tri(dataImaging, diag=TRUE)] <- NA
+    }
     
     ##create pairs of drugs from benchmark 1 if same drug set from GMT and 0 otherwise
     benchDat[upper.tri(benchDat, diag=TRUE)] <- NA
@@ -56,6 +66,30 @@ generateDrugPairsModded <- function(benchDat, strcAff, sensAff, pertAff, integra
     integrPairs <- na.omit(integrPairs)
     colnames(integrPairs)[3] <- "obs.combiall"
     
-    res <- list(benchPairs=benchPairs, strcPairs=strcPairs, sensPairs=sensPairs, pertPairs=pertPairs, integrPairs=integrPairs)
+    luminexPairs <- NULL
+    imagingPairs <- NULL
+    
+    if (!is.null(luminexAff) && !is.null(imagingAff)) {
+        luminexPairs <- melt(dataLuminex)
+        luminexPairs <- na.omit(luminexPairs)
+        colnames(luminexPairs)[3] <- "obs.luminex"
+        
+        imagingPairs <- melt(dataImaging)
+        imagingPairs <- na.omit(imagingPairs)
+        colnames(imagingPairs)[3] <- "obs.imaging"
+    } else if (!is.null(imagingAff) && is.null(luminexAff)) {
+        imagingPairs <- melt(dataImaging)
+        imagingPairs <- na.omit(imagingPairs)
+        colnames(imagingPairs)[3] <- "obs.imaging"
+    } else if (!is.null(luminexAff) && is.null(imagingAff)) {
+        luminexPairs <- melt(dataLuminex)
+        luminexPairs <- na.omit(luminexPairs)
+        colnames(luminexPairs)[3] <- "obs.luminex"
+    }
+    
+    res <- list(benchPairs=benchPairs, strcPairs=strcPairs, 
+                sensPairs=sensPairs, pertPairs=pertPairs, integrPairs=integrPairs,
+                luminexPairs=luminexPairs, imagingPairs=imagingPairs)
+    
     return(res)
 }

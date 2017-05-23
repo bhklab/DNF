@@ -12,7 +12,7 @@
 ## 
 ###############################################################################################################
 
-generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
+generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName, file.name, num.drugs) {
   
   
   predIntegr <- predPerf(allPairs$integrPairs$obs.combiall, allPairs$benchPairs$bench)
@@ -31,8 +31,9 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
   }
   
   # changing params for the ROC plot - width, etc
-  filename = paste(getwd(), "/Output/", "ROC_", d1Name, "_", d2Name, "_", benchName, ".pdf", sep="")
-  pdf(filename, width=5, height = 5)
+  #filename = paste(getwd(), "/Output/", "ROC_", d1Name, "_", d2Name, "_", benchName, ".pdf", sep="")
+  #pdf(filename, width=5, height = 5)
+  pdf(file.name, width=5, height = 5)
   par(mar=c(5,5,2,2), xaxs = "i", yaxs = "i", cex.axis=1.3, cex.lab=1.4)
   # plotting the ROC curve
   plot(predIntegr$perf, col="black", lwd=2)
@@ -70,7 +71,7 @@ generateRocPlot <- function(allPairs, d1Name, d2Name="lincs", benchName) {
            box.col = "white",fill=c("black","#d7191c","#41ab5d","#2b83ba", "pink", "purple", "orange", "gray"))
   }
   
-  
+  title(paste("AUC Benchmark Num of Drugs: ", num.drugs, sep=" "))
   abline(0,1, col = "gray")
   dev.off()
   

@@ -12,8 +12,6 @@
 
 
 drugTargetBenchModded <- function(benchname, cdrugs, gmt_file_name="") {
-    
-    
     if (benchname == "ctrpv") {
         # DRUG TARGETS BENCHMARKING FROM CTRPV2
         ctrpDrTargs <- read.csv("./Data/CTRPv2_drugtarget.csv", stringsAsFactors = FALSE) # 481 drugs x 3 descriptions
@@ -31,60 +29,30 @@ drugTargetBenchModded <- function(benchname, cdrugs, gmt_file_name="") {
         ## single target categorty 
         drgTargets <- drgTargets[,c("MOLECULE_NAME","TARGET_NAME")]
         
-    } else if (benchname == "gdsc") {
-        x <- read.csv("./Data/GDSC1000_druginfo.csv", stringsAsFactors = FALSE)
-        x$drugid <- toupper(x$drugid)
-        x$drugid <- gsub(badchars, "", x$drugid)
-        length(unique(x$drugid))
-        
-        x <- x[x$drugid %in% cdrugs,,drop=F] 
-        x <- x[,c("drugid", "TARGET")] 
-        colnames(x)[1:2] <- c("MOLECULE_NAME","TARGET_NAME")
-        drgTargets <- x
-        
     }
-    else if (benchname == "chembl") {
-        ## read CHEMBL drug file downloaded from Chembl website
-        chemblDrTargs <- read.delim("Data/chembl_drugtargets-16_5-10-02.txt", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
-        drgTargets <- chemblDrTargs[,c("MOLECULE_NAME", "TARGET_NAME")]
-        ## remove badchar from Chembl and common drug file + capitalize 
-        drgTargets[,1] <- gsub(badchars, "",  drgTargets[,1])
-        drgTargets[,1] <- toupper(drgTargets[,1])
-        drgTargets <- drgTargets[drgTargets[,1] %in% cdrugs,]
-        
-    } else if (benchname == "stitch") {
-        ## DRUG TARGETS BENCHMARKING
-        stitchDrTargs <- read.delim("Data/stitch.tsv", stringsAsFactor=F, na.strings=c("", "NA")) ## read protein-chemical from stitch embl http://stitch.embl.de/
-        stitchDrTargs$chemical <- gsub("CID1","",stitchDrTargs$chemical) ## the CID1 is a standard id for merged isomers and stereoismers
-        stitchDrTargs$chemical <- gsub("CID0","",stitchDrTargs$chemical) ## the CID0 is a standard id for unique cpds
-        stitchDrTargs$chemical <- gsub("(^|[^0-9])0+", "\\1", stitchDrTargs$chemical, perl = TRUE) ## remove 0s to keep the pubchem CID
-        stitchDrTargs <- stitchDrTargs[stitchDrTargs$experimental!=0 & stitchDrTargs$database!=0 ,,drop=F] ### select all interactions
-        stitchDrTargs$protein <- gsub("9606.", "", stitchDrTargs$protein) ## remove the 9606 (homo sapiens taxon and keep ENSEMBL PROT ID)
-        interscChem <- intersect(stitchDrTargs$chemical, cdrugs$pubchem_cid) # intersect pubchem id between the common 345 drugs in LINCS/NCI60 and STITCH
-        stitchDrTargs <- stitchDrTargs[stitchDrTargs$chemical %in% interscChem,,drop=F] ## Keep data from STITCH (drugs in common)
-        drugsCommonStitch <- cdrugs[cdrugs$pubchem_cid %in% interscChem,,drop=F] ## Keep data from LINCS/NCI60 ((drugs in common))
-        colnames(stitchDrTargs)[1] <- "pubchem_cid" ### change 1st column in STITCH to pubchem_cid so we can merge between stitch and LINCS/NCI60 pheno data file
-        ## merge STITCH database and drugsCommonStitch
-        stitchDrTargs <- merge(stitchDrTargs, drugsCommonStitch, by="pubchem_cid") ## merge data
-        ## Take only the 2 columns ("protein","pert_iname")
-        stitchDrTargs <- stitchDrTargs[,c("protein","pert_iname")]
-        stitchDrTargs <- stitchDrTargs[,c(2,1)]
-        colnames(stitchDrTargs)[1:2] <- c("MOLECULE_NAME","TARGET_NAME") 
-        ## single target categorty 
-        drgTargets <- stitchDrTargs[,c("MOLECULE_NAME","TARGET_NAME")] ### rename to starg, maybe to keep stitch_targets in case of error!
-        #dim(drgTargets)
-        
-    } else if (benchname == "uniprot")  {
-        ## read CHEMBL drug file downloaded from Chembl website
-        chemblDrTargs <- read.csv("./Data/uniprot links.csv", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
-        drgTargets <- chemblDrTargs[,c("Name", "UniProt.Name")]
-        colnames(drgTargets) <-  c("MOLECULE_NAME","TARGET_NAME")
-        ## remove badchar from Chembl and common drug file + capitalize 
-        drgTargets[,1] <- gsub(badchars, "",  drgTargets[,1])
-        drgTargets[,1] <- toupper(drgTargets[,1])
-        drgTargets <- drgTargets[drgTargets[,1] %in% cdrugs,]
-        
-    } 
+    
+    ## read CHEMBL drug file downloaded from Chembl website
+    chemblDrTargs <- read.delim("Data/chembl_drugtargets-16_5-10-02.txt", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
+    chemblDrTargs <- chemblDrTargs[,c("MOLECULE_NAME", "TARGET_NAME")]
+    ## remove badchar from Chembl and common drug file + capitalize 
+    chemblDrTargs[,1] <- gsub(badchars, "",  chemblDrTargs[,1])
+    chemblDrTargs[,1] <- toupper(chemblDrTargs[,1])
+    
+    chemblDrTargs <- chemblDrTargs[chemblDrTargs$MOLECULE_NAME %in% cdrugs,]
+    chemblDrTargs <- chemblDrTargs[chemblDrTargs[,1] %in% cdrugs,]
+    
+    drgTargets <- rbind.data.frame(drgTargets, chemblDrTargs, stringsAsFactors = FALSE)
+    
+    ## read CHEMBL drug file downloaded from Chembl website
+    chemblDrTargs <- read.csv("./Data/uniprot links.csv", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
+    uniprotTargs <- chemblDrTargs[,c("Name", "UniProt.Name")]
+    colnames(uniprotTargs) <-  c("MOLECULE_NAME","TARGET_NAME")
+    ## remove badchar from Chembl and common drug file + capitalize 
+    uniprotTargs[,1] <- gsub(badchars, "",  uniprotTargs[,1])
+    uniprotTargs[,1] <- toupper(uniprotTargs[,1])
+    uniprotTargs <- uniprotTargs[uniprotTargs[,1] %in% cdrugs,]
+    
+    drgTargets <- rbind.data.frame(drgTargets, uniprotTargs, stringsAsFactors = FALSE)
     
     if (TRUE) {
         dtcTargs <- read.csv("Data/dtcTargets.csv", stringsAsFactors = FALSE)
@@ -93,7 +61,6 @@ drugTargetBenchModded <- function(benchname, cdrugs, gmt_file_name="") {
         drgTargetsAdditional <- dtcTargs[dtcTargs[,1] %in% cdrugs,]
         
         drgTargets <- rbind.data.frame(drgTargets, drgTargetsAdditional, stringsAsFactors = FALSE)
-        drgTargets <- drgTargets[!duplicated(drgTargets),]
     }
     
     #Number of drugs with TARGETS: length(unique(chembl_Targets.common.all$MOLECULE_NAME))
