@@ -13,6 +13,7 @@ source('./RCode/constSensitivityLayer.R')
 source('./RCode/constSensitivityLayerCombined.R')
 source('./RCode/constPerturbationLayer.R')
 source('./RCode/integrateStrctSensPert.R')
+source('./RCode/integrateStrctSensPertModded.R')
 source('./RCode/drugTargetBench.R')
 source('./RCode/drugTargetBenchModded.R')
 source('./RCode/generateDrugPairs.R')
@@ -30,6 +31,9 @@ source('./RCode/cindexComp2.R')
 
 source("./RCode/luminexData.R")
 source("./RCode/constLuminexLayer.R")
+
+source("./RCode/imagingData.R")
+source("./RCode/constImagingLayer.R")
 
 library(PharmacoGx)
 library(apcluster)
@@ -61,14 +65,19 @@ dim(cDrugs)  ##239 X 28 for just CTRPv2, 309 x 28 for combined data
 # Process Sensitivity, Perturbation, and Structure layers for set of common drugs
 sensData <- sensitivityDataModded("combined", cDrugs, "Data/combined_sens_adjusted_diag_datasets_with.RData")  ## 645 X 239
 dim(sensData) # 309 x 309 for combined data
-pertData <- perturbationDataModded("lincs", cDrugs, "ctrpv2")  ## 978 X 239
+pertData <- perturbationDataModded("Data/L1000_compound_signatures.RData", cDrugs)  ## 978 X 239
 dim(pertData) # 978 x 237 for 
 strcData <- structureData("lincs", cDrugs)  ## a vector  --> 239 elemnts
 length(strcData)
+
 luminexData <- LuminexData(cDrugs, badchars)
 dim(luminexData)
+imagingData <- ImagingData(cDrugs, badchars)
+dim(imagingData)
 
 ## Get the common drugs (239) among the 3 datasets/layers
+#commonDrugs <- Reduce(intersect,list(sort(names(strcData)),sort(colnames(sensData)),
+#                                     sort(colnames(pertData))))
 commonDrugs <- Reduce(intersect,list(sort(names(strcData)),sort(colnames(sensData)),
                                      sort(colnames(pertData))))
 length(commonDrugs) ## 239 ..
@@ -76,21 +85,24 @@ length(commonDrugs) ## 239 ..
 strcData<- strcData[commonDrugs] # 239 drugs
 sensData <- sensData[commonDrugs, commonDrugs] # 645 x 239 drugs
 pertData<- pertData[, commonDrugs] #978 genes x  239 
-#luminexData <- luminexData[, commonDrugs]
+luminexData <- luminexData[, commonDrugs]
+imagingData <- imagingData[, commonDrugs]
 
 
 ## network layer construction and integration by SNF
 strcAffMat <- constStructureLayer(strcData)
 sensAffMat <- constSensitivityLayerCombined(sensData)
 pertAffMat <- constPerturbationLayer(pertData)
-integrtStrctSensPert <- integrateStrctSensPert(sensAffMat, strcAffMat, pertAffMat)
+luminexAffMat <- constLuminexLayer(luminexData)
+imagingAffMat <- constImagingLayer(imagingData)
+integrtStrctSensPert <- integrateStrctSensPertModded(sensAffMat, strcAffMat, pertAffMat)
 save(integrtStrctSensPert, file="Data/ctrpv2-Integrated.RData")
 
 
 ## Benchmarking and validation
 ## 1- DRUG-TARGET 
 ## loading and cleaning benchmark dataset
-#dataBench <- drugTargetBench("ctrpv",  commonDrugs) # 141 x 141 drug-drug adjacency matrix --> 141
+dataBench <- drugTargetBench("ctrpv",  commonDrugs) # 141 x 141 drug-drug adjacency matrix --> 141
 dataBench <- drugTargetBenchModded("ctrpv",  colnames(sensData), "gmt_targ_combined_with_gdsc_adjusted_diag.RData") # 141 x 141 drug-drug adjacency matrix --> 141
 load("Data/averageIorioPGX-all.RData") ## drug similarity matrix calculated based on Iorio snd Iskar et al. score (see iorioDIPS_PGX.R)
 load("Data/averageIskarFinal.RData") ##load "iskar" results here ... (see iskar.R)
@@ -116,7 +128,7 @@ cat("p-vals from the c.index comparison of integration layer vs. \n structure: "
     "\n sensitivity: ", res$pVals$intgrSensPVal)
 
 ## ROC and PR plots
-generateRocPlotModded(pairs, d1Name="ctrpv2", d2Name="lincs", benchNam="drug-target_combined_adjusted_diagonal_with")
+generateRocPlotModded(pairs, d1Name="ctrpv2", d2Name="lincs", benchName="drug-target_combined_adjusted_diagonal_with")
 generatePRPlot(pairs, d1Name="ctrpv2", d2Name="lincs", benchNam="drug-target_combined_adjusted_diagonal_with")
 
 ## 2- ATC

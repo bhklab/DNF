@@ -1,0 +1,37 @@
+###############################################################################################################
+## Function reads in the perturbation data, processes/filters according to the intersection subset provided in the preprocess stage
+##
+## input: 
+##     intersc: a vector of "character" (for "ctrpv2") or dataframe (for "nci60") containting intersection info.
+## output: 
+##     perturbation data ("dataframe") 	
+##
+## 
+###############################################################################################################
+
+
+PerturbationDataFlexible <- function(pert.file.name, lincs.meta) {
+    
+    ## read the perturbation file
+    load(pert.file.name)
+    #pertLincs <- l1000.drug.signatures
+    pertLincs <- L1000_compounds.perturbation
+    
+    ## extract estimates of the drug pert signatures
+    dfLincs <- pertLincs[,,"estimate"] # 978 genes x 20364 drugs. Actually looks like it's 978 genes x 414 drugs
+    ## load pheno data and match with gene profiles
+    dfLincs <- dfLincs[, match(lincs.meta$pert_id,colnames(dfLincs))] #239 drugs
+    ## genes symbol replacement from genids
+    rownames(dfLincs) <- gsub(x = rownames(dfLincs),pattern = "geneid.",replacement = "")
+    symb <- annotate::lookUp(rownames(dfLincs), 'org.Hs.eg', 'SYMBOL')
+    rownames(dfLincs) <- unlist(unname(symb)) 
+    dfLincs <- dfLincs[!is.na(rownames(dfLincs)),]
+    
+    colnames(dfLincs) <- lincs.meta$pert_iname
+    dfLincs <- dfLincs[, !apply(is.na(dfLincs), 2, all)] #Remove drugs which has all NA in columns
+    dim(dfLincs) #237 drugs after all filtering. ACtually looks like it's 239
+    dfLincs <- dfLincs[, order(colnames(dfLincs)),drop=F]
+    
+    return(dfLincs)
+    
+}
