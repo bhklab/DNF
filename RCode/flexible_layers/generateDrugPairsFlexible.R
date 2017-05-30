@@ -3,8 +3,8 @@
 ## final (intersection) subset of drugs
 ##
 ## input: 
-##     benchDat
-##     benchDat
+##     bench.data
+##     bench.data
 ##     strcAff
 ##     sensAff
 ##     pertAff
@@ -16,15 +16,15 @@
 ## 
 ###############################################################################################################
 
-GenerateDrugPairsFlexible <- function(benchDat, strcAff=NULL, sensAff=NULL, 
-                                    pertAff=NULL, integration=NULL, 
-                                    luminexAff=NULL, imagingAff=NULL) {
+GenerateDrugPairsFlexible <- function(bench.data, strc.aff=NULL, sens.aff=NULL, 
+                                    pert.aff=NULL, integration=NULL, 
+                                    luminex.aff=NULL, imaging.aff=NULL) {
     
-    layers <- list(strcAff=strcAff, sensAff=sensAff, pertAff=pertAff, integr=integration,
-                   luminexAff=luminexAff, imagingAff=imagingAff)
+    layers <- list(strcAff=strc.aff, sensAff=sens.aff, pertAff=pert.aff, integr=integration,
+                   luminexAff=luminex.aff, imagingAff=imaging.aff)
     
     layers <- layers[!sapply(layers, is.null)]
-    intx <- intersect(colnames(benchDat), colnames(layers[[1]]))
+    intx <- intersect(colnames(bench.data), colnames(layers[[1]]))
     
     data.list <- list()
     
@@ -42,10 +42,10 @@ GenerateDrugPairsFlexible <- function(benchDat, strcAff=NULL, sensAff=NULL,
     
     pairs.list <- list()
     
-    benchDat[upper.tri(benchDat, diag=TRUE)] <- NA
-    benchPairs <- melt(benchDat)
-    benchPairs <- na.omit(benchPairs)
-    colnames(benchPairs)[3] <- "bench"
+    bench.data[upper.tri(bench.data, diag=TRUE)] <- NA
+    bench.pairs <- melt(bench.data)
+    bench.pairs <- na.omit(bench.pairs)
+    colnames(bench.pairs)[3] <- "bench"
     
     for (i in 1:length(data.list)) {
         prefix <- strsplit(names(data.list)[i], split="data")[[1]][2]
@@ -59,7 +59,7 @@ GenerateDrugPairsFlexible <- function(benchDat, strcAff=NULL, sensAff=NULL,
         pairs.list[[pairs.name]] <-  temp
     }
     
-    pairs.list[["benchPairs"]] <- benchPairs
+    pairs.list[["benchPairs"]] <- bench.pairs
     
     return(pairs.list)
 }

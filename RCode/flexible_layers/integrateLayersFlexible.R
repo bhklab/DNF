@@ -2,9 +2,9 @@
 ## Function reads in the affinity matrices or network layers of sensitivity, structure and perturbation data, 
 ## and integrates them via SNF (similarity network fusion) method 
 ## input: 
-##     sensAff: affinity matrix generated in the "constSensitivityLayer"
-##     strcAff: affinity matrix generated in the "constStructureLayer"
-##     pertAff: affinity matrix generated in the "constPerturbationLayer"
+##     sens.aff: affinity matrix generated in the "constSensitivityLayer"
+##     strc.aff: affinity matrix generated in the "constStructureLayer"
+##     pert.aff: affinity matrix generated in the "constPerturbationLayer"
 ##     
 ## output: 
 ##     integartion result (matrix)  
@@ -13,9 +13,10 @@
 ###############################################################################################################
 
 
-IntegrateLayersFlexible <- function(sensAff=NULL, strcAff=NULL, pertAff=NULL, luminexAff=NULL, imagingAff=NULL) {
-    layers <- list(sensAff=sensAff, strcAff=strcAff, pertAff=pertAff,
-                   luminexAff=luminexAff, imagingAff=imagingAff)
+IntegrateLayersFlexible <- function(sens.aff=NULL, strc.aff=NULL, pert.aff=NULL,
+                                    luminex.aff=NULL, imaging.aff=NULL) {
+    layers <- list(sens.aff=sens.aff, strc.aff=strc.aff, pert.aff=pert.aff,
+                   luminex.aff=luminex.aff, imaging.aff=imaging.aff)
     layers <- layers[!sapply(layers, is.null)]
     
     if (length(layers) > 1) {
@@ -27,6 +28,5 @@ IntegrateLayersFlexible <- function(sensAff=NULL, strcAff=NULL, pertAff=NULL, lu
     
 
     return(integration)
-    
 }
 

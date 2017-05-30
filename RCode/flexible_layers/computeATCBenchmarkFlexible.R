@@ -4,9 +4,9 @@ ComputeATCBenchmarkFlexible <- function(atc.benchmark.name, common.drugs, strc.a
     
     atc.bench <- ATCBenchFlexible("chembl-new", common.drugs)
     
-    pairs.atc <- GenerateDrugPairsFlexible(atc.bench, strcAff=strc.aff.mat, sensAff=sens.aff.mat,
-                                           pertAff=pert.aff.mat, integration=integration,
-                                           luminexAff=luminex.aff.mat, imagingAff=imaging.aff.mat)
+    pairs.atc <- GenerateDrugPairsFlexible(atc.bench, strc.aff=strc.aff.mat, sens.aff=sens.aff.mat,
+                                           pert.aff=pert.aff.mat, integration=integration,
+                                           luminex.aff=luminex.aff.mat, imaging.aff=imaging.aff.mat)
     
     res.atc <- CompConcordIndxFlexible(pairs.atc)
     

@@ -33,42 +33,47 @@ print(dim(pertData)) # 978 x 237 for
 colnames(pertData) <- toupper(colnames(pertData))
 colnames(pertData) <- gsub(badchars, "", colnames(pertData))
 
-#pertNames <- colnames(pertData)
+pertNames <- colnames(pertData)
 
 #pertNames <- lincs.meta$pert_iname
-pertNames <- colnames(sensData)
+#pertNames <- colnames(sensData)
 
 layers <- list(sensNames = sort(colnames(sensData)), pertNames=pertNames)
 commonDrugs <- Reduce(intersect, Filter(Negate(is.null),layers))
 
-ctrpv2 <- drugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=TRUE,
+ctrpv2 <- DrugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=TRUE,
                                 use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
 ctrpv2 <- unique(colnames(ctrpv2))
 
-clue <- drugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=FALSE,
-                                use.clue=TRUE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+clue <- DrugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=FALSE,
+                              use.clue=TRUE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
 clue <- unique(colnames(clue))
 
-chembl <- drugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=FALSE,
+chembl <- DrugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=FALSE,
                                 use.clue=FALSE, use.chembl=TRUE, use.dbank=FALSE, use.dtc=FALSE)
 chembl <- unique(colnames(chembl))
 
-dbank <- drugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=FALSE,
+dbank <- DrugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=FALSE,
                                use.clue=FALSE, use.chembl=FALSE, use.dbank=TRUE, use.dtc=FALSE)
 dbank <- unique(colnames(dbank))
 
-dtc <- drugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=FALSE,
+dtc <- DrugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=FALSE,
                              use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=TRUE)
 dtc <- unique(colnames(dtc))
 
-target.list <- list(ctrpv2=ctrpv2, clue=clue, dtc=dtc)
+target.list <- list(clue=clue, chembl=chembl, dbank=dbank)
 
 names.with.count <- toupper(paste(names(target.list), sapply(target.list, length)))
 
+
+union.size <- length(unique(Reduce(union, target.list)))
+main.title = paste("3 Layers Overlap Between Clue-Chembl-Drug Bank Benchmarks \n ", 
+                   "Total Unique Drugs:",union.size)
+
 vp <- venn.diagram(target.list,
-                   fill = 1:3, alpha = 0.3, filename = NULL, imagetype = "png",
+                   fill = c(5,6,7), alpha = 0.3, filename = NULL, imagetype = "png",
                    category.names = names.with.count, cat.cex=2, cat.dist=0.1, margin=0.1, 
-                   main="Sensitivity Layer Overlap Between CTRPv2-Clue-DTC Benchmarks", main.cex=2.5,
+                   main=main.title, main.cex=2.2,
                    main.fontfamily="Arial")
 
 vp

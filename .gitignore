@@ -5,3 +5,9 @@
 Psets/
 Output/
 *.pdf
+Data/Broad.HG005032.ProfilingData
+Data/Broad.PNAS2014.ProfilingData
+Data/DTC_data.csv
+Data/L1000_compound_signatures.RData
+misc_computations/
+*.log

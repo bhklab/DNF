@@ -12,10 +12,10 @@
 
 
 
-SensitivityDataFlexible <- function(combined_file_path="") {
-    combinedSens <- readRDS(combined_file_path)
-    combinedSens <- combinedSens[!duplicated(rownames(combinedSens)), , drop=FALSE]
-    sens <- combinedSens
+SensitivityDataFlexible <- function(combined.file.path="") {
+    combined.sens <- readRDS(combined.file.path)
+    combined.sens <- combined.sens[!duplicated(rownames(combined.sens)), , drop=FALSE]
+    sens <- combined.sens
 
     return(sens)
     

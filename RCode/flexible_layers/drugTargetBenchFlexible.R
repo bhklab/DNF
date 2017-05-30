@@ -2,7 +2,6 @@
 ## Function reads in the benchmark sets and filter them out according to the intersection of the input datasets
 ## 
 ## input: 
-##     benchname: name ("character") of the drug-target benchmark, e.g., "ctrpv", "chembl", or "stitch"
 ##     cdrugs: a vector of common drugs between the input datasets
 ## output: 
 ##        a drug x drug adjacency/similarity matrix
@@ -11,7 +10,7 @@
 ###############################################################################################################
 
 
-DrugTargetBenchModded <- function(cdrugs, gmt_file_name="", use.ctrpv2=FALSE,
+DrugTargetBenchFlexible <- function(cdrugs, gmt_file_name="", use.ctrpv2=FALSE,
                                   use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
     drug.targets = data.frame(MOLECULE_NAME=character(0), TARGET_NAME=character(0))
     
@@ -105,14 +104,14 @@ DrugTargetBenchModded <- function(cdrugs, gmt_file_name="", use.ctrpv2=FALSE,
     drug.targets <- drug.targets[!is.na(drug.targets[,2]),]
     
     ## create a gmt file from Target codes, each Target class contains a number of drugs
-    listofTargs <- list()
+    list.of.targs <- list()
     for(targName in unique(drug.targets$TARGET_NAME)){
         targGmt <- with(drug.targets, MOLECULE_NAME[TARGET_NAME==targName]) 
-        listofTargs[[targName]] <- targGmt
+        list.of.targs[[targName]] <- targGmt
     }
     ## filter out the targets common between more than 2 drugs
-    common.targs <- sapply(listofTargs, function(x) length(x) >= 2)
-    GMT_TARG<- listofTargs[common.targs]
+    common.targs <- sapply(list.of.targs, function(x) length(x) >= 2)
+    GMT_TARG<- list.of.targs[common.targs]
     save(GMT_TARG, file = paste(getwd(), "/Output/", gmt_file_name, sep=""))
     
     ## Build an adjacency matrix target x drugs and keep only filtered targets in GMT file

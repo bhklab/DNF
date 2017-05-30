@@ -15,12 +15,12 @@ StructureDataFlexible <- function(lincs.meta.subset)
 {
     ## Matrix of SMILES (tanimoto distance) 
     ## parse smiles 
-    targetMolcs <- rcdk::parse.smiles(as.character(lincs.meta.subset$canonical_smiles))  
+    target.molcs <- rcdk::parse.smiles(as.character(lincs.meta.subset$canonical_smiles))  
     ## assign fingerprints (extended connectivity fingerprint)
-    targetFps <- lapply(targetMolcs, rcdk::get.fingerprint, type='extended') 
-    names(targetFps) <- lincs.meta.subset$pert_iname
-    length(targetFps) 
-    res <- targetFps
+    target.fps <- lapply(target.molcs, rcdk::get.fingerprint, type='extended') 
+    names(target.fps) <- lincs.meta.subset$pert_iname
+    length(target.fps) 
+    res <- target.fps
     
     return(res)
 }
