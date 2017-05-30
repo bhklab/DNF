@@ -11,6 +11,9 @@ source("RCode/flexible_layers/compConcordIndxFlexible.R")
 source("RCode/flexible_layers/printCIndices.R")
 source("RCode/flexible_layers/printPVals.R")
 source("RCode/flexible_layers/generateROCPlotFlexible.R")
+source("RCode/flexible_layers/atcBenchFlexible.R")
+source("RCode/flexible_layers/compDrugTargetBenchmarkFlexible.R")
+source("RCode/flexible_layers/computeATCBenchmarkFlexible.R")
 
 source("RCode/cindexComp2.R")
 source("RCode/constImagingLayer.R")
@@ -45,16 +48,30 @@ lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
 pert.file.name <- "Data/L1000_compound_signatures.RData"
 sensitivity.file.name <- "Data/combined_sens_adjusted_diag_datasets_with.RData"
     
-res <- Main(use.sensitivity = TRUE, use.perturbation=FALSE, use.structure = TRUE, 
-     use.imaging = TRUE, use.luminex = FALSE, sensitivity.file.name = sensitivity.file.name,
-     pert.file.name = pert.file.name, lincs.meta = lincs.meta)
+res <- Main(use.sensitivity = TRUE, use.perturbation=TRUE, use.structure = TRUE, 
+     use.imaging = FALSE, use.luminex = FALSE, sensitivity.file.name = sensitivity.file.name,
+     pert.file.name = pert.file.name, lincs.meta = lincs.meta, use.ctrpv2=TRUE,
+     use.clue=TRUE, use.chembl=TRUE, use.dbank=TRUE, use.dtc=TRUE)
 
 Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, use.luminex, 
-                 sensitivity.file.name="", pert.file.name="", lincs.meta=NULL, benchmark.name="ctrpv2") {
-    roc.file.name <- CreateROCFileName(sensitivity.file.name=sensitivity.file.name, 
-                                       benchmark.name=benchmark.name, use.sensitivity=use.sensitivity,
+                 sensitivity.file.name="", pert.file.name="", lincs.meta=NULL,
+                 atc.benchmark.name="chembl-new", compute.atc=TRUE, use.ctrpv2=FALSE, use.clue=FALSE,
+                 use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
+    target.roc.file.name <- CreateROCFileName(sensitivity.file.name=sensitivity.file.name, 
+                                       atc.benchmark.name=atc.benchmark.name, use.sensitivity=use.sensitivity,
                                        use.perturbation=use.perturbation, use.structure=use.structure,
-                                       use.luminex=use.luminex, use.imaging=use.imaging)
+                                       use.luminex=use.luminex, use.imaging=use.imaging, target.or.atc = TRUE,
+                                       use.ctrpv2=use.ctrpv2,
+                                       use.clue=use.clue, use.chembl=use.chembl, use.dbank=use.dbank,
+                                       use.dtc=use.dtc)
+    
+    atc.roc.file.name <- CreateROCFileName(sensitivity.file.name=sensitivity.file.name, 
+                                           atc.benchmark.name=atc.benchmark.name, use.sensitivity=use.sensitivity,
+                                           use.perturbation=use.perturbation, use.structure=use.structure,
+                                           use.luminex=use.luminex, use.imaging=use.imaging, target.or.atc = FALSE,
+                                           use.ctrpv2=use.ctrpv2,
+                                           use.clue=use.clue, use.chembl=use.chembl, use.dbank=use.dbank,
+                                           use.dtc=use.dtc)
     sensData <- NULL
     pertData <- NULL
     strcData <- NULL
@@ -78,8 +95,10 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
         colnames(pertData) <- toupper(colnames(pertData))
         colnames(pertData) <- gsub(badchars, "", colnames(pertData))
         pertNames <- colnames(pertData)
-    } else {
+    } else if (use.structure) {
         pertNames <- lincs.meta$pert_iname
+    } else {
+        pertNames <- colnames(sensData)
     }
 
     if (use.luminex) {
@@ -138,28 +157,27 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
     integrated <- IntegrateLayersFlexible(sensAff=sensAffMat, strcAff=strcAffMat, pertAff=pertAffMat, 
                                           luminexAff=luminexAffMat, imagingAff=imagingAffMat)
     
-    if (benchmark.name == "ctrpv2") {
-        dataBench <- drugTargetBench("ctrpv",  commonDrugs) # 141 x 141 drug-drug adjacency matrix --> 141
-    } else if (benchmark.name == "combined") {
-        dataBench <- drugTargetBenchModded("ctrpv",  commonDrugs, 
-                                           "temp.RData") # 141 x 141 drug-drug adjacency matrix --> 141
+    CompDrugTargetBenchmarkFlexible(common.drugs=commonDrugs,
+                            strc.aff.mat=strcAffMat, sens.aff.mat=sensAffMat, pert.aff.mat=pertAffMat,
+                            integration=integrated, luminex.aff.mat=luminexAffMat,
+                            imaging.aff.mat=imagingAffMat, target.roc.file.name=target.roc.file.name,
+                            use.ctrpv2=use.ctrpv2, use.clue=use.clue, use.chembl=use.chembl, 
+                            use.dbank=use.dbank, use.dtc=use.dtc)
+    if (!compute.atc) {
+        return()
     }
     
-    pairs <- GenerateDrugPairsFlexible(dataBench, strcAff=strcAffMat, sensAff=sensAffMat,
-                                       pertAff=pertAffMat, integration=integrated,
-                                       luminexAff=luminexAffMat, imagingAff=imagingAffMat)
-    
-    res <- CompConcordIndxFlexible(pairs)
-    
-    PrintCIndices(res$c.index.list)
-    PrintPVals(res$p.vals.list)
-    
-    GenerateROCPlotFlexible(pairs, roc.file.name, nrow(dataBench))
+    ComputeATCBenchmarkFlexible(atc.benchmark.name=atc.benchmark.name, common.drugs=commonDrugs,
+                                strc.aff.mat=strcAffMat, sens.aff.mat=sensAffMat, pert.aff.mat=pertAffMat,
+                                integration=integrated, luminex.aff.mat=luminexAffMat, 
+                                imaging.aff.mat=imagingAffMat, atc.roc.file.name=atc.roc.file.name)
 }
 
-CreateROCFileName <- function(sensitivity.file.name="", benchmark.name="", use.sensitivity=FALSE,
-                             use.perturbation=FALSE, use.structure=FALSE, use.luminex=FALSE,
-                             use.imaging=FALSE) {
+CreateROCFileName <- function(sensitivity.file.name="", target.benchmark.name="",
+                              atc.benchmark.name="",use.sensitivity=FALSE,
+                              use.perturbation=FALSE, use.structure=FALSE, use.luminex=FALSE,
+                              use.imaging=FALSE, target.or.atc=FALSE, use.ctrpv2=FALSE, use.clue=FALSE,
+                              use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
     base.dir <- "Output/auc_p_flex"
     
     if(!file.exists(base.dir)) {
@@ -190,7 +208,33 @@ CreateROCFileName <- function(sensitivity.file.name="", benchmark.name="", use.s
     if (use.imaging) {
         file.name <- paste(file.name, "imaging", sep="_")
     }
+    
+    if (target.or.atc == TRUE) {
+        file.name <- paste(file.name, "target", sep="_")
 
-    file.name <- paste(file.name, benchmark.name, sep="_")
+        if (use.ctrpv2) {
+            file.name <- paste(file.name, "ctrpv2", sep="_")
+        }
+        
+        if (use.clue) {
+            file.name <- paste(file.name, "clue", sep="_")
+        }
+        
+        if (use.chembl) {
+            file.name <- paste(file.name, "chembl", sep="_")
+        }
+        
+        if (use.dbank) {
+            file.name <- paste(file.name, "dbank", sep="_")
+        }
+        
+        if (use.dtc) {
+            file.name <- paste(file.name, "dtc", sep="_")
+        }
+    } else {
+        file.name <- paste(file.name, "atc", sep="_")
+        file.name <- paste(file.name, atc.benchmark.name, sep="_")
+    }
+    
     file.name <- paste(file.name, "pdf", sep=".")
 }

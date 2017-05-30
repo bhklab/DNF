@@ -11,8 +11,11 @@
 ###############################################################################################################
 
 
-drugTargetBenchModded <- function(benchname, cdrugs, gmt_file_name="") {
-    if (benchname == "ctrpv") {
+drugTargetBenchModded <- function(cdrugs, gmt_file_name="", use.ctrpv2=FALSE,
+                                  use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
+    drgTargets = data.frame(MOLECULE_NAME=character(0), TARGET_NAME=character(0))
+    
+    if (use.ctrpv2) {
         # DRUG TARGETS BENCHMARKING FROM CTRPV2
         ctrpDrTargs <- read.csv("./Data/CTRPv2_drugtarget.csv", stringsAsFactors = FALSE) # 481 drugs x 3 descriptions
         ctrpDrTargs$compound_name <- toupper(ctrpDrTargs$compound_name)
@@ -28,33 +31,67 @@ drugTargetBenchModded <- function(benchname, cdrugs, gmt_file_name="") {
         drgTargets <- data.frame(MOLECULE_NAME = rep(ctrpDrTargs$MOLECULE_NAME, sapply(drgTargets, length)), TARGET_NAME = unlist(drgTargets))
         ## single target categorty 
         drgTargets <- drgTargets[,c("MOLECULE_NAME","TARGET_NAME")]
-        
     }
     
-    ## read CHEMBL drug file downloaded from Chembl website
-    chemblDrTargs <- read.delim("Data/chembl_drugtargets-16_5-10-02.txt", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
-    chemblDrTargs <- chemblDrTargs[,c("MOLECULE_NAME", "TARGET_NAME")]
-    ## remove badchar from Chembl and common drug file + capitalize 
-    chemblDrTargs[,1] <- gsub(badchars, "",  chemblDrTargs[,1])
-    chemblDrTargs[,1] <- toupper(chemblDrTargs[,1])
+    if (use.chembl) {
+        ## read CHEMBL drug file downloaded from Chembl website
+        chemblDrTargs <- read.delim("Data/chembl_drugtargets-16_5-10-02.txt", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
+        chemblDrTargs <- chemblDrTargs[,c("MOLECULE_NAME", "TARGET_NAME")]
+        ## remove badchar from Chembl and common drug file + capitalize 
+        chemblDrTargs[,1] <- gsub(badchars, "",  chemblDrTargs[,1])
+        chemblDrTargs[,1] <- toupper(chemblDrTargs[,1])
+        
+        chemblDrTargs <- chemblDrTargs[chemblDrTargs$MOLECULE_NAME %in% cdrugs,]
+        chemblDrTargs <- chemblDrTargs[chemblDrTargs[,1] %in% cdrugs,]
+        
+        drgTargets <- rbind.data.frame(drgTargets, chemblDrTargs, stringsAsFactors = FALSE)
+    }
     
-    chemblDrTargs <- chemblDrTargs[chemblDrTargs$MOLECULE_NAME %in% cdrugs,]
-    chemblDrTargs <- chemblDrTargs[chemblDrTargs[,1] %in% cdrugs,]
+    if (use.dbank) {
+        ## Drug bank targets
+        dbankDrTargs <- read.csv("./Data/uniprot links.csv", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
+        uniprotTargs <- dbankDrTargs[,c("Name", "UniProt.Name")]
+        colnames(uniprotTargs) <-  c("MOLECULE_NAME","TARGET_NAME")
+        ## remove badchar from Chembl and common drug file + capitalize 
+        uniprotTargs[,1] <- toupper(uniprotTargs[,1])
+        uniprotTargs[,1] <- gsub(badchars, "",  uniprotTargs[,1])
+        uniprotTargs <- uniprotTargs[uniprotTargs[,1] %in% cdrugs,]
+        
+        drgTargets <- rbind.data.frame(drgTargets, uniprotTargs, stringsAsFactors = FALSE)
+    }
     
-    drgTargets <- rbind.data.frame(drgTargets, chemblDrTargs, stringsAsFactors = FALSE)
+    if (use.clue) {
+        #####
+        ### Get drug targets from clue.io
+        clue.io.targets <- read.delim("Data/repurposing_drugs_20170327.txt", stringsAsFactors = FALSE)
+        
+        # Ignore first several rows which are just meta about the dataset
+        clue.io.targets <- clue.io.targets[which(clue.io.targets$X.1 == 'target'):nrow(clue.io.targets), ]
+        # By this point the first row has the relevant column names, so we set the column names based 
+        # on this row
+        colnames(clue.io.targets) <- clue.io.targets[1, ]
+        
+        # Get rid of that first row, since now the colnames() attribute has been set to it
+        clue.io.targets <- clue.io.targets[-1, ]
+        # Take only the two relevant columns of the drug name and target
+        clue.io.targets <- clue.io.targets[, c("pert_iname", "target")]
+        # Standardize column names like all the other column names in the benchmarks 
+        colnames(clue.io.targets) <- c("MOLECULE_NAME", "TARGET_NAME")
+        
+        clue.io.targets$MOLECULE_NAME <- toupper(clue.io.targets$MOLECULE_NAME)
+        clue.io.targets$MOLECULE_NAME <- gsub(badchars, "", clue.io.targets$MOLECULE_NAME)
+        
+        clue.io.targets <- clue.io.targets[clue.io.targets$MOLECULE_NAME %in% cdrugs, ]
+        
+        clue.targets <- strsplit(clue.io.targets$TARGET_NAME, split="|", fixed=TRUE)
+        clue.targets <- data.frame(MOLECULE_NAME = rep(clue.io.targets$MOLECULE_NAME,
+                                                       sapply(clue.targets, length)), TARGET_NAME = unlist(clue.targets))
+        drgTargets <- rbind.data.frame(drgTargets, clue.targets, stringsAsFactors = FALSE)
+        ###
+        #####    
+    }
     
-    ## read CHEMBL drug file downloaded from Chembl website
-    chemblDrTargs <- read.csv("./Data/uniprot links.csv", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
-    uniprotTargs <- chemblDrTargs[,c("Name", "UniProt.Name")]
-    colnames(uniprotTargs) <-  c("MOLECULE_NAME","TARGET_NAME")
-    ## remove badchar from Chembl and common drug file + capitalize 
-    uniprotTargs[,1] <- gsub(badchars, "",  uniprotTargs[,1])
-    uniprotTargs[,1] <- toupper(uniprotTargs[,1])
-    uniprotTargs <- uniprotTargs[uniprotTargs[,1] %in% cdrugs,]
-    
-    drgTargets <- rbind.data.frame(drgTargets, uniprotTargs, stringsAsFactors = FALSE)
-    
-    if (TRUE) {
+    if (use.dtc) {
         dtcTargs <- read.csv("Data/dtcTargets.csv", stringsAsFactors = FALSE)
         colnames(dtcTargs) <-  c("MOLECULE_NAME","TARGET_NAME")
         

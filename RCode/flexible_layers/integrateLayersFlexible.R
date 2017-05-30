@@ -18,11 +18,14 @@ IntegrateLayersFlexible <- function(sensAff=NULL, strcAff=NULL, pertAff=NULL, lu
                    luminexAff=luminexAff, imagingAff=imagingAff)
     layers <- layers[!sapply(layers, is.null)]
     
-    integration <- SNFtool::SNF(layers)    
+    if (length(layers) > 1) {
+        integration <- SNFtool::SNF(layers)   
+        colnames(integration) <- rownames(integration) <- colnames(layers[[1]])
+    } else {
+        integration <- layers[[1]]
+    }
     
-    
-    colnames(integration) <- rownames(integration) <- colnames(layers[[1]])
-    
+
     return(integration)
     
 }
