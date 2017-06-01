@@ -112,7 +112,7 @@ DrugTargetBenchFlexible <- function(cdrugs, gmt_file_name="", use.ctrpv2=FALSE,
     ## filter out the targets common between more than 2 drugs
     common.targs <- sapply(list.of.targs, function(x) length(x) >= 2)
     GMT_TARG<- list.of.targs[common.targs]
-    save(GMT_TARG, file = paste(getwd(), "/Output/", gmt_file_name, sep=""))
+    #save(GMT_TARG, file = paste(getwd(), "/Output/", gmt_file_name, sep=""))
     
     ## Build an adjacency matrix target x drugs and keep only filtered targets in GMT file
     ## data frame with 0/1

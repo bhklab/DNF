@@ -61,13 +61,13 @@ dtc <- DrugTargetBenchModded(commonDrugs, "temp.RData", use.ctrpv2=FALSE,
                              use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=TRUE)
 dtc <- unique(colnames(dtc))
 
-target.list <- list(clue=clue, chembl=chembl, dbank=dbank)
+target.list <- list(ctrpv2=ctrpv2, clue=clue, dbank=dbank)
 
 names.with.count <- toupper(paste(names(target.list), sapply(target.list, length)))
 
 
 union.size <- length(unique(Reduce(union, target.list)))
-main.title = paste("3 Layers Overlap Between Clue-Chembl-Drug Bank Benchmarks \n ", 
+main.title = paste("3 Layers Overlap Between CTRPv2-Clue-Drug Bank Benchmarks \n ", 
                    "Total Unique Drugs:",union.size)
 
 vp <- venn.diagram(target.list,
@@ -76,9 +76,8 @@ vp <- venn.diagram(target.list,
                    main=main.title, main.cex=2.2,
                    main.fontfamily="Arial")
 
-vp
-grid.draw(vp)
 old.par <- par(mar = c(0, 0, 0, 0))
 plot.new()
 frame()
 par(old.par)
+grid.draw(vp)

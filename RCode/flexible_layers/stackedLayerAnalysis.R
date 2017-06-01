@@ -47,10 +47,10 @@ lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
 lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
 
 pert.file.name <- "Data/L1000_compound_signatures.RData"
-sensitivity.file.name <- "Data/combined_sens_adjusted_diag_datasets_with.RData"
+sensitivity.file.name <- "Data/combined_sens_adjusted_diag_inamedatasets_with.RData"
     
 res <- Main(use.sensitivity = TRUE, use.perturbation=TRUE, use.structure = TRUE, 
-     use.imaging = FALSE, use.luminex = TRUE, sensitivity.file.name = sensitivity.file.name,
+     use.imaging = FALSE, use.luminex = FALSE, sensitivity.file.name = sensitivity.file.name,
      pert.file.name = pert.file.name, lincs.meta = lincs.meta, use.ctrpv2=TRUE,
      use.clue=TRUE, use.chembl=TRUE, use.dbank=TRUE, use.dtc=TRUE)
 
@@ -111,6 +111,7 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
                    luminex.names = sort(colnames(luminex.data)), imaging.names = sort(colnames(imaging.data)))
 
     common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+    print(length(common.drugs))
     
     # Subset the datasets for the different layers based on common drugs
     sens.data <- sens.data[common.drugs, common.drugs] # 645 x 239 drugs
@@ -154,6 +155,7 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
 
     integrated <- IntegrateLayersFlexible(sens.aff=sens.aff.mat, strc.aff=strc.aff.mat, pert.aff=pert.aff.mat, 
                                           luminex.aff=luminex.aff.mat, imaging.aff=imaging.aff.mat)
+    print("Integration done")
     
     CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs,
                             strc.aff.mat=strc.aff.mat, sens.aff.mat=sens.aff.mat, pert.aff.mat=pert.aff.mat,

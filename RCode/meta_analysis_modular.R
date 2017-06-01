@@ -16,10 +16,10 @@ badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]
 datasets_with_gdsc <- list(CCLE, gCSI, GDSC1000, CTRPv2, FIMM)
 datasets_without_gdsc <- list(CCLE, gCSI, CTRPv2, FIMM)
 
-datasets <- list(datasets_without_gdsc = datasets_without_gdsc, datasets_with_gdsc = datasets_with_gdsc)
+datasets <- list(datasets_with_gdsc = datasets_with_gdsc)
 for (i in 1:length(datasets)) {
     temp <- strsplit(names(datasets)[i], '_')[[1]]
-    save_dir <- paste('combined_sens_adjusted_diag_', temp[1], '_', temp[2], '.RData', sep="")
+    save_dir <- paste('combined_sens_adjusted_diag_iname', temp[1], '_', temp[2], '.RData', sep="")
     discrepancies <- main(datasets[[i]], save_dir = save_dir)
     print(discrepancies)
 }

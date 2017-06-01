@@ -39,17 +39,25 @@ any(duplicated(imaging.meta[combined, "name"]))
 
 imaging_drug_names <- imaging.meta[combined, c("BROAD_ID", "name")]
 imaging_drug_names <- imaging_drug_names[!duplicated(imaging_drug_names$name),]
-imaging_subsetted <- imaging[which(imaging$BROAD_ID %in% imaging_drug_names$BROAD_ID),]
-imaging_subsetted <- imaging_subsetted[!duplicated(imaging_subsetted$BROAD_ID),]
+imaging.subsetted <- imaging[which(imaging$BROAD_ID %in% imaging_drug_names$BROAD_ID),]
+imaging.subsetted <- imaging.subsetted[!duplicated(imaging.subsetted$BROAD_ID),]
 
-aligned_indices <- match(imaging_subsetted$BROAD_ID, imaging_drug_names$BROAD_ID)
-rownames(imaging_subsetted) <- imaging_drug_names$name[aligned_indices]
-imaging_subsetted <- imaging_subsetted[, -1]
-
+aligned_indices <- match(imaging.subsetted$BROAD_ID, imaging_drug_names$BROAD_ID)
+rownames(imaging.subsetted) <- imaging_drug_names$name[aligned_indices]
+imaging.subsetted <- imaging.subsetted[, -1]
 
 # Optional normalization
-imaging_subsetted <- scale(imaging_subsetted)
-imaging_subsetted <- t(imaging_subsetted)
-imaging_subsetted <- as.matrix(imaging_subsetted)
+imaging.subsetted <- scale(imaging.subsetted)
+imaging.subsetted <- imaging.subsetted[, colSums(is.na(imaging.subsetted)) != nrow(imaging.subsetted)]
 
-saveRDS(imaging_subsetted, "Data/imaging_subsetted.RData")
+# Optional dimensionality reduction
+princ <- prcomp(imaging.subsetted)
+n.comp <- 20
+
+df.components <- predict(princ, newdata=imaging.subsetted)[,1:n.comp]
+
+imaging.subsetted <- t(df.components)
+imaging.subsetted <- as.matrix(imaging.subsetted)
+
+
+saveRDS(imaging.subsetted, "Data/imaging_subsetted_pca.RData")

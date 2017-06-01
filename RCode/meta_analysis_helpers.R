@@ -32,6 +32,9 @@ CreateAucsAll <- function(datasets, drugs, cell.lines, badchars) {
         rownames(aucs) <- toupper(rownames(aucs))
         rownames(aucs) <- gsub(badchars, "", rownames(aucs))
         
+        # Replace with pert_iname from LINCS where possible
+        rownames(aucs) <- ReplaceDrugNamesManualCurationPertInames(rownames(aucs))
+        
         index.names <- paste(pSetName(datasets[[i]]), old.names, sep=":::")
         rownames(aucs.all)[which(rownames(aucs.all) %in% index.names)] <- paste(pSetName(datasets[[i]]), rownames(aucs), sep=":::")
         aucs.all[paste(pSetName(datasets[[i]]), rownames(aucs), sep=":::"), colnames(aucs)] <- aucs
@@ -75,6 +78,30 @@ ReplaceDrugNames <- function(drug.names, dataset) {
     
     corrected.names
     
+}
+
+ReplaceDrugNamesManualCurationPertInames <- function(drug.names) {
+    manual.mapping <- read.csv("Data/mapping_manual_curation_inchikeys.csv")
+    manual.mapping$drugnames <- toupper(manual.mapping$drugnames)
+    manual.mapping$drugnames <- gsub(badchars, "", manual.mapping$drugnames)
+    manual.mapping$pert_iname <- toupper(manual.mapping$pert_iname)
+    manual.mapping$pert_iname <- gsub(badchars, "", manual.mapping$pert_iname)
+    
+    pert.inames <- drug.names
+    
+    for (i in 1:length(drug.names)) {
+        drug.name <- drug.names[i]
+        
+        relevant.row <- manual.mapping[which(manual.mapping$drugnames == drug.name), ]
+        
+        replace.value <- relevant.row[1, "pert_iname"]
+        
+        if (!is.na(replace.value)) {
+            pert.inames[i] <- replace.value
+        }
+    }
+    
+    pert.inames
 }
 
 CreateFinalCorrelationWithoutDups <- function(aucs.cor, aucs.drugs) {
