@@ -47,7 +47,7 @@ lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
 lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
 
 pert.file.name <- "Data/L1000_compound_signatures.RData"
-sensitivity.file.name <- "Data/combined_sens_adjusted_diag_inamedatasets_with.RData"
+sensitivity.file.name <- "Data/combined_sensitivity_dataset_iname_replaced.RData"
     
 res <- Main(use.sensitivity = TRUE, use.perturbation=TRUE, use.structure = TRUE, 
      use.imaging = FALSE, use.luminex = FALSE, sensitivity.file.name = sensitivity.file.name,

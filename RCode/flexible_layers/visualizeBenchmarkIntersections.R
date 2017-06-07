@@ -1,4 +1,3 @@
-install.packages("VennDiagram")
 library(VennDiagram)
 library(org.Hs.eg.db)
 source("RCode/flexible_layers/sensitivityDataFlexible.R")
@@ -8,7 +7,7 @@ source("RCode/drugTargetBenchModded.R")
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
 
 pert.file.name <- "Data/L1000_compound_signatures.RData"
-sensitivity.file.name <- "Data/combined_sens_adjusted_diag_datasets_with.RData"
+sensitivity.file.name <- "Data/combined_sens_adjusted_diag_inamedatasets_with.RData"
 lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
 lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
 lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)

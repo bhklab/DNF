@@ -2,7 +2,7 @@
 ## Function reads in the benchmark set and filter them out according to the intersection of the input datasets
 ## 
 ## input: 
-##     benchname: name ("character") of the ATC benchmark, currently must be set to "chembl"
+##     dname: name ("character") of the ATC benchmark, currently must be set to "chembl"
 ##     common.drugs: a vector of common drugs between the input datasets
 ## output: 
 ##        a drug x drug adjacency/similarity matrix
@@ -110,9 +110,5 @@ ATCBenchFlexible <- function(dname, common.drugs) {
         save(data.bench, file=paste(getwd(), "/Output/", "drug_bench_atc_binary_NEW.RData", sep=""))
     }
     
-    
-    
-    
     return(data.bench)
-    
 }

@@ -1,0 +1,55 @@
+rm(list=ls())
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+#old_data <- readRDS("Data/combined_sens_datasets_with.RData")
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.names <- lincs.meta$pert_iname
+lincs.names <- toupper(lincs.names)
+lincs.names <- gsub(badchars, "", lincs.names)
+
+luminex.meta <- read.delim("Data/Broad.HG005032.ProfilingData/luminex/cdrp.l1000.meta.cpd.txt", stringsAsFactors = FALSE)
+luminex <- read.delim("Data/Broad.HG005032.ProfilingData/luminex/cdrp.l1000.profiles.txt", stringsAsFactors = FALSE)
+
+# Clean names and IDs
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+lincs.meta$pert_id <- toupper(lincs.meta$pert_id)
+lincs.meta$pert_id <- gsub(badchars, "", lincs.meta$pert_id)
+luminex.meta$name <- toupper(luminex.meta$name)
+luminex.meta$name <- gsub(badchars, "", luminex.meta$name)
+
+# Find relevant intersection of drugs in L1000 and cell painting. 
+# This is based on matching the "name" column from the cell painting data
+# against both the pert_iname and pert_id columns from the L1000 meta data,
+# and then getting rid of dupes. 
+pert.id.inter <- which(luminex.meta$name %in% lincs.meta$pert_id)
+pert.name.inter <- which(luminex.meta$name %in% lincs.meta$pert_iname)
+# Get rid of dupes
+pert.name.inter <- luminex.meta$name[pert.name.inter]
+pert.name.inter <- pert.name.inter[!duplicated(pert.name.inter)]
+pert.name.inter <- match(pert.name.inter, luminex.meta$name)
+
+combined <- unique(union(pert.id.inter, pert.name.inter))
+# Get rid of dupes
+temp.combined <- luminex.meta$name[combined]
+temp.combined <- temp.combined[!duplicated(temp.combined)]
+combined <- match(temp.combined, luminex.meta$name)
+
+# This should be FALSE as we have gotten rid of dupes by this point
+any(duplicated(luminex.meta[combined, "name"]))
+
+luminex_drug_names <- luminex.meta[combined, c("BROAD_ID", "name")]
+luminex_drug_names <- luminex_drug_names[!duplicated(luminex_drug_names$name),]
+luminex_subsetted <- luminex[which(luminex$BROAD_ID %in% luminex_drug_names$BROAD_ID),]
+luminex_subsetted <- luminex_subsetted[!duplicated(luminex_subsetted$BROAD_ID),]
+
+aligned_indices <- match(luminex_subsetted$BROAD_ID, luminex_drug_names$BROAD_ID)
+rownames(luminex_subsetted) <- luminex_drug_names$name[aligned_indices]
+luminex_subsetted <- luminex_subsetted[, -1]
+
+
+# Optional normalization
+luminex_subsetted <- scale(luminex_subsetted)
+luminex_subsetted <- t(luminex_subsetted)
+luminex_subsetted <- as.matrix(luminex_subsetted)
+
+saveRDS(luminex_subsetted, "Data/luminex_subsetted.RData")
