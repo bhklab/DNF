@@ -51,8 +51,8 @@ imaging.subsetted <- scale(imaging.subsetted)
 imaging.subsetted <- imaging.subsetted[, colSums(is.na(imaging.subsetted)) != nrow(imaging.subsetted)]
 
 # Optional dimensionality reduction
-princ <- prcomp(imaging.subsetted)
-n.comp <- 20
+princ <- prcomp(imaging.subsetted, scale=TRUE)
+n.comp <- 50
 
 df.components <- predict(princ, newdata=imaging.subsetted)[,1:n.comp]
 
@@ -60,4 +60,4 @@ imaging.subsetted <- t(df.components)
 imaging.subsetted <- as.matrix(imaging.subsetted)
 
 
-saveRDS(imaging.subsetted, "Data/imaging_subsetted_pca.RData")
+saveRDS(imaging.subsetted, "Data/imaging_subsetted_predictive_pca.RData")

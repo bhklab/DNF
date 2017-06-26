@@ -34,7 +34,7 @@ CreateAucsAll <- function(datasets, drugs, cell.lines, badchars) {
         rownames(aucs) <- gsub(badchars, "", rownames(aucs))
         
         # Replace with pert_iname from LINCS where possible
-        #rownames(aucs) <- ReplaceDrugNamesManualCurationPertInames(rownames(aucs))
+        rownames(aucs) <- ReplaceDrugNamesManualCurationPertInames(rownames(aucs))
         
         index.names <- paste(pSetName(datasets[[i]]), old.names, sep=":::")
         rownames(aucs.all)[which(rownames(aucs.all) %in% index.names)] <- paste(pSetName(datasets[[i]]), rownames(aucs), sep=":::")

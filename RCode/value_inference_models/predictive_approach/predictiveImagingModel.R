@@ -15,7 +15,7 @@ load("PSets/CTRPv2.RData")
 load("PSets/GDSC1000.RData")
 load("PSets/FIMM.RData")
 
-imaging.data <- readRDS("Data/imaging_subsetted_pred_pca.RData")
+imaging.data <- readRDS("Data/imaging_subsetted_predictive_pca.RData")
 imaging.data <- t(imaging.data)
 
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
@@ -66,7 +66,7 @@ for (i in 1:ncol(imaging.data.final)) {
                                    na.action=na.pass)
 }
 
-# Take the sensitivity drugs that didn't intersect witht the imaging data,
+# Take the sensitivity drugs that didn't intersect with the imaging data,
 # create a template matrix based on them.
 names.of.drugs.to.augment <- sort(setdiff(sens.names, overlap))
 drugs.to.augment <- matrix(0, ncol=ncol(aucs.all), nrow=length(names.of.drugs.to.augment))

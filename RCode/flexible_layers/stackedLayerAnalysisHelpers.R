@@ -96,3 +96,23 @@ CreateATCROCFileName <- function(sensitivity.file.name="", atc.benchmark.name=""
     
     file.name <- paste(file.name, "pdf", sep=".")
 }
+
+CreateGMTFileName <- function(use.sensitivity=FALSE,
+                              use.perturbation=FALSE, use.structure=FALSE, use.luminex=FALSE,
+                              use.imaging=FALSE, use.ctrpv2=FALSE, use.clue=FALSE,
+                              use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
+    file.name <- CreateBaseFileName()
+    
+    file.name <- paste(file.name, "communities", sep="")
+    
+    file.name <- AddLayersToFileName(file.name=file.name, sensitivity.file.name="",
+                                     use.sensitivity=use.sensitivity, use.perturbation=use.perturbation,
+                                     use.structure=use.structure, use.luminex=use.luminex,
+                                     use.imaging=use.imaging)
+    
+    file.name <- AddDrugTargetBenchmarksToFileName(file.name, use.ctrpv2=use.ctrpv2,
+                                                   use.clue=use.clue, use.chembl=use.chembl,
+                                                   use.dbank=use.dbank, use.dtc=use.dtc)
+    
+    file.name <- paste(file.name, "RData", sep=".")
+}

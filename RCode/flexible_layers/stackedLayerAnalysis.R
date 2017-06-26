@@ -23,9 +23,12 @@ source("RCode/flexible_layers/atcBenchFlexible.R")
 source("RCode/flexible_layers/compDrugTargetBenchmarkFlexible.R")
 source("RCode/flexible_layers/computeATCBenchmarkFlexible.R")
 source("RCode/flexible_layers/stackedLayerAnalysisHelpers.R")
+source("RCode/flexible_layers/communityGenFlexible.R")
 
 source("RCode/cindexComp2.R")
 source("RCode/predPerf.R")
+
+source("RCode/temp/computeCIndex.R")
 
 library(PharmacoGx)
 library(apcluster)
@@ -41,6 +44,7 @@ library(proxy)
 library(PRROC)
 library(apcluster)
 
+# Load lincs metadata and clean the pert_inames in it
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
 lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
 lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
@@ -52,12 +56,13 @@ sensitivity.file.name <- "Data/combined_sensitivity_dataset_iname_replaced.RData
 res <- Main(use.sensitivity = TRUE, use.perturbation=TRUE, use.structure = TRUE, 
      use.imaging = FALSE, use.luminex = FALSE, sensitivity.file.name = sensitivity.file.name,
      pert.file.name = pert.file.name, lincs.meta = lincs.meta, use.ctrpv2=TRUE,
-     use.clue=TRUE, use.chembl=TRUE, use.dbank=TRUE, use.dtc=TRUE)
+     use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE,
+     create.communities=FALSE)
 
 Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, use.luminex, 
                  sensitivity.file.name="", pert.file.name="", lincs.meta=NULL,
                  atc.benchmark.name="chembl-new", compute.atc=TRUE, use.ctrpv2=FALSE, use.clue=FALSE,
-                 use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
+                 use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE) {
     target.roc.file.name <- CreateTargetROCFileName(sensitivity.file.name=sensitivity.file.name, 
                                        use.sensitivity=use.sensitivity,
                                        use.perturbation=use.perturbation, use.structure=use.structure,
@@ -70,6 +75,14 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
                                            atc.benchmark.name=atc.benchmark.name, use.sensitivity=use.sensitivity,
                                            use.perturbation=use.perturbation, use.structure=use.structure,
                                            use.luminex=use.luminex, use.imaging=use.imaging)
+    
+    gmt.file.name <- CreateGMTFileName(use.sensitivity=use.sensitivity,
+                                       use.perturbation=use.perturbation, use.structure=use.structure,
+                                       use.luminex=use.luminex, use.imaging=use.imaging,
+                                       use.ctrpv2=use.ctrpv2,
+                                       use.clue=use.clue, use.chembl=use.chembl, use.dbank=use.dbank,
+                                       use.dtc=use.dtc)
+    
     sens.data <- NULL
     pert.data <- NULL
     strc.data <- NULL
@@ -77,6 +90,8 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
     imaging.data <- NULL
     
     if (use.sensitivity) {
+        # Load in the sensitivity data. Note that unlike before, this is now
+        # already a correlation matrix.
         sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
         dim(sens.data) # 309 x 309 for combined data    
         rownames(sens.data) <- toupper(rownames(sens.data))
@@ -87,6 +102,8 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
     }
 
     if (use.perturbation) {
+        # If using the perturbation layer, use the names from the signature
+        # file as the names to be intersected with the sensitivity layer
         pert.data <- PerturbationDataFlexible(pert.file.name, lincs.meta)  ## 978 X 239
         print(dim(pert.data)) # 978 x 237 for         
         
@@ -94,9 +111,15 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
         colnames(pert.data) <- gsub(badchars, "", colnames(pert.data))
         pert.names <- colnames(pert.data)
     } else if (use.structure) {
+        # If using the structure layer, use the pert_iname column from the LINCS
+        # metadata file as the names to be intersected with the sensitivity layer.
+        # The reason for this is that the LINCS metadata file also has a column
+        # with SMILES in it which will later on be used to create the fingerprints.
         pert.names <- lincs.meta$pert_iname
     } else {
-        pert.names <- colnames(sens.data)
+        # If not using the perturbation or structure layer, then there is no intersection
+        # to be performed between sensitivity layer and perturbation or structure layer.
+        pert.names <- NULL
     }
 
     if (use.luminex) {
@@ -107,9 +130,9 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
         imaging.data <- ImagingDataFlexible(badchars)
     }
     
+    # Find the common drugs between the selected layers
     layers <- list(sens.names = sort(colnames(sens.data)), pert.names=pert.names,
                    luminex.names = sort(colnames(luminex.data)), imaging.names = sort(colnames(imaging.data)))
-
     common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
     print(length(common.drugs))
     
@@ -153,22 +176,32 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
         imaging.aff.mat <- ConstImagingLayerFlexible(imaging.data)
     }
 
+    # Combine the selected layers via SNF
     integrated <- IntegrateLayersFlexible(sens.aff=sens.aff.mat, strc.aff=strc.aff.mat, pert.aff=pert.aff.mat, 
                                           luminex.aff=luminex.aff.mat, imaging.aff=imaging.aff.mat)
+    
+    saveRDS(integrated, "integrated.RData")
     print("Integration done")
     
-    CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs,
+    # Compute P-Values and create an AUC plot for the drug target benchmark
+    CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name=gmt.file.name,
                             strc.aff.mat=strc.aff.mat, sens.aff.mat=sens.aff.mat, pert.aff.mat=pert.aff.mat,
                             integration=integrated, luminex.aff.mat=luminex.aff.mat,
                             imaging.aff.mat=imaging.aff.mat, target.roc.file.name=target.roc.file.name,
                             use.ctrpv2=use.ctrpv2, use.clue=use.clue, use.chembl=use.chembl, 
                             use.dbank=use.dbank, use.dtc=use.dtc)
-    if (!compute.atc) {
-        return()
+    if (compute.atc) {
+        # Compute P-Values and create an AUC plot for the ATC benchmark
+        ComputeATCBenchmarkFlexible(atc.benchmark.name=atc.benchmark.name, common.drugs=common.drugs,
+                                    strc.aff.mat=strc.aff.mat, sens.aff.mat=sens.aff.mat, pert.aff.mat=pert.aff.mat,
+                                    integration=integrated, luminex.aff.mat=luminex.aff.mat, 
+                                    imaging.aff.mat=imaging.aff.mat, atc.roc.file.name=atc.roc.file.name)
     }
     
-    ComputeATCBenchmarkFlexible(atc.benchmark.name=atc.benchmark.name, common.drugs=common.drugs,
-                                strc.aff.mat=strc.aff.mat, sens.aff.mat=sens.aff.mat, pert.aff.mat=pert.aff.mat,
-                                integration=integrated, luminex.aff.mat=luminex.aff.mat, 
-                                imaging.aff.mat=imaging.aff.mat, atc.roc.file.name=atc.roc.file.name)
+    if (create.communities) {
+        # Use Affinity Propagation clustering to determine the clusters
+        # formed by the integrated layer.
+        load(gmt.file.name)
+        CommunityGenFlexible(integrated, GMT_TARG)
+    }
 }
