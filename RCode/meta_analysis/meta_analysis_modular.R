@@ -1,11 +1,15 @@
+### Creates a combined sensitivity correlation matrix by combining data from several sensitivity PSets.
+### This is just a matter of merging correlations using combine.est, and cleverly adjusting diagonal terms.
+### This script takes a few minutes to run since it has to determine the number of samples used to 
+### compute each correlation which is the inefficient part.
+
+rm(list=ls())
 library(PharmacoGx)
 library(survcomp)
 library(ggplot2)
 
 source('./RCode/meta_analysis/getDisagreementBetweenDatasets.R')
 source('./RCode/meta_analysis/visualizeDatasetDiscrepancies.R')
-# Creates a correlation matrix from all the sensitivity datasets combined into one.
-
 source('./RCode/meta_analysis/meta_analysis_helpers.R')
 load("PSets/CCLE_hs.RData")
 load("PSets/gCSI_hs.RData")
@@ -13,6 +17,8 @@ load("PSets/CTRPv2.RData")
 load("PSets/GDSC1000.RData")
 load("PSets/FIMM.RData")
 
+# badchars are characters to be removed from drug names. This list of characters was determined 
+# by Nehme.
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
 
 datasets_with_gdsc <- list(CCLE, gCSI, GDSC1000, CTRPv2, FIMM)
@@ -21,7 +27,7 @@ datasets_without_gdsc <- list(CCLE, gCSI, CTRPv2, FIMM)
 datasets <- list(datasets_with_gdsc = datasets_with_gdsc)
 for (i in 1:length(datasets)) {
     temp <- strsplit(names(datasets)[i], '_')[[1]]
-    save_dir <- paste('combined_sensitivity_dataset_iname_replaced', temp[1], '_', temp[2], '.RData', sep="")
+    save_dir <- paste('Data/combined_sensitivity/combined_sens_iname_replaced', temp[1], '_', temp[2], '.RData', sep="")
     discrepancies <- main(datasets[[i]], save_dir = save_dir)
     print(discrepancies)
 }
@@ -89,12 +95,3 @@ main <- function(datasets, save_dir) {
     
     self.discrepancies
 }
-
-
-best_drugs <- lapply(dataset_pairs, function(x) {sort(x, decreasing = TRUE)[1:5]})
-worst_drugs <- lapply(dataset_pairs, function(x) {sort(x, decreasing = FALSE)[1:5]})
-
-saveRDS(aucs.cor2, './Data/combined_sens.RData')
-
-
-

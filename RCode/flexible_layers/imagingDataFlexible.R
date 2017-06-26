@@ -8,7 +8,7 @@ ImagingDataFlexible <- function(badchars) {
     # Returns:
     #   A matrix where each column corresponds to a drug, and each row
     #   is an imaging feature.
-    imaging.data <- readRDS("Data/imaging_subsetted_predictive_pca.RData")
+    imaging.data <- readRDS("Data/imaging_processed/imaging_subsetted_predictive_pca.RData")
     
     colnames(imaging.data) <- toupper(colnames(imaging.data))
     colnames(imaging.data) <- gsub(badchars, "", colnames(imaging.data))

@@ -27,8 +27,6 @@ CompConcordIndxFlexible <- function(all.pairs, compute.p.val=TRUE) {
             
             temp <- Hmisc::rcorr.cens(x=all.pairs[[i]][, paste("obs", pair.name, sep=".")], S=all.pairs$benchPairs$bench)
             c.index.obj.list[[c.index.name]] <- temp
-            bad.performers[[c.index.name]] <- FindBadPerformers(x=all.pairs[[i]][, paste("obs", pair.name, sep=".")],
-                                                                y=all.pairs$benchPairs$bench)
         }
     
     }

@@ -1,6 +1,8 @@
+### Takes the imaging dataset, subsets it according to the intersection with L1000, and then
+### performs PCA on the common drugs in order to reduce the number of features.
+
 rm(list=ls())
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
-#old_data <- readRDS("Data/combined_sens_datasets_with.RData")
 lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
 lincs.names <- lincs.meta$pert_iname
 lincs.names <- toupper(lincs.names)
@@ -37,6 +39,7 @@ combined <- match(temp.combined, imaging.meta$name)
 # This should be FALSE as we have gotten rid of dupes by this point
 any(duplicated(imaging.meta[combined, "name"]))
 
+# USe the previously determined indices in 'combined' to subset the imaging data.
 imaging_drug_names <- imaging.meta[combined, c("BROAD_ID", "name")]
 imaging_drug_names <- imaging_drug_names[!duplicated(imaging_drug_names$name),]
 imaging.subsetted <- imaging[which(imaging$BROAD_ID %in% imaging_drug_names$BROAD_ID),]
@@ -59,5 +62,6 @@ df.components <- predict(princ, newdata=imaging.subsetted)[,1:n.comp]
 imaging.subsetted <- t(df.components)
 imaging.subsetted <- as.matrix(imaging.subsetted)
 
-
-saveRDS(imaging.subsetted, "Data/imaging_subsetted_predictive_pca.RData")
+# imaging.subsetted is now of the shape NUM_FEATURES x NUM_DRUGS. Thus,
+# to compute correlation, we don't have to transpose or do anything else.
+saveRDS(imaging.subsetted, "Data/imaging_processed/imaging_subsetted_predictive_pca.RData")

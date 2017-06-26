@@ -18,6 +18,7 @@ CreateAucsAll <- function(datasets, drugs, cell.lines, badchars) {
     
     for (i in 1:length(datasets)) {
         aucs <- summarizeSensitivityProfiles(pSet = datasets[[i]], sensitivity.measure = "auc_recomputed")
+        # Drug names with a ':' in them indicate drug combos, so we ignore these.
         aucs <- aucs[!grepl(":", rownames(aucs)),]
         # Clean up drug names the same way they're being cleaned in the DNF code. By doing this here
         # we end up with drug rownames and colnames remaining in sorted order. Otherwise if we did this step
@@ -33,7 +34,8 @@ CreateAucsAll <- function(datasets, drugs, cell.lines, badchars) {
         rownames(aucs) <- toupper(rownames(aucs))
         rownames(aucs) <- gsub(badchars, "", rownames(aucs))
         
-        # Replace with pert_iname from LINCS where possible
+        # Replace drug names with pert_iname from LINCS where possible. This is
+        # due to Nehme in order to increase intersection between sensitivity and L1000.
         rownames(aucs) <- ReplaceDrugNamesManualCurationPertInames(rownames(aucs))
         
         index.names <- paste(pSetName(datasets[[i]]), old.names, sep=":::")

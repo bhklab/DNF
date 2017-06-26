@@ -1,3 +1,7 @@
+# This script is similar to the main-ctrpv-lincs.R script in the original version of DNF except that
+# it is flexible in terms of what layers are being used. Arbitrary combinations of layers, as well
+# as arbitrary combinations of drug target datasets can be used in the analysis.
+
 rm(list=ls())
 
 source("RCode/flexible_layers/structureDataFlexible.R")
@@ -28,8 +32,6 @@ source("RCode/flexible_layers/communityGenFlexible.R")
 source("RCode/cindexComp2.R")
 source("RCode/predPerf.R")
 
-source("RCode/temp/computeCIndex.R")
-
 library(PharmacoGx)
 library(apcluster)
 library(rcdk)
@@ -51,7 +53,7 @@ lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
 lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
 
 pert.file.name <- "Data/L1000_compound_signatures.RData"
-sensitivity.file.name <- "Data/combined_sensitivity_dataset_iname_replaced.RData"
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
     
 res <- Main(use.sensitivity = TRUE, use.perturbation=TRUE, use.structure = TRUE, 
      use.imaging = FALSE, use.luminex = FALSE, sensitivity.file.name = sensitivity.file.name,
