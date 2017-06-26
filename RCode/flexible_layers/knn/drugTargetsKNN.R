@@ -99,9 +99,21 @@ DrugTargetsKNN <- function(cdrugs, gmt_file_name="communities_flexible", use.ctr
         drug.targets <- rbind.data.frame(drug.targets, drug.targetsAdditional, stringsAsFactors = FALSE)
     }
     
+    list.of.targs <- list()
+    for(targName in unique(drug.targets$TARGET_NAME)){
+        targGmt <- with(drug.targets, MOLECULE_NAME[TARGET_NAME==targName]) 
+        list.of.targs[[targName]] <- targGmt
+    }
+    
+    common.targs <- sapply(list.of.targs, function(x) length(x) >= 2)
+    GMT_TARG<- list.of.targs[common.targs]
+    
+    
+    
     #Number of drugs with TARGETS: length(unique(chembl_Targets.common.all$MOLECULE_NAME))
     drug.targets <- unique(drug.targets)
     drug.targets <- drug.targets[!is.na(drug.targets[,2]),]
+    drug.targets <- drug.targets[drug.targets$TARGET_NAME %in% names(GMT_TARG), ]
 
     return(drug.targets)
 }

@@ -16,7 +16,6 @@ CompConcordIndxFlexible <- function(all.pairs, compute.p.val=TRUE) {
     #   whether the significance in improvement of the integration of layers vs. single layers.
     # 
     c.index.obj.list <- list()
-    bad.performers <- list()
     
     # Create a list of c index objects
     for (i in 1:length(all.pairs)) {
@@ -62,7 +61,7 @@ CompConcordIndxFlexible <- function(all.pairs, compute.p.val=TRUE) {
     }
     
     # Return both lists of results
-    r <- list(c.index.list=c.index.list, p.vals.list=p.vals.list, bad.performers=bad.performers) 
+    r <- list(c.index.list=c.index.list, p.vals.list=p.vals.list) 
     
     return(r)
 }

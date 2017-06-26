@@ -6,9 +6,10 @@ predPerf <- function(layerPair, benchPair, plotType="ROC") {
   if (plotType == "ROC") {
     pred <- prediction(layerPair, benchPair)
     perf <- performance(pred,"tpr","fpr")
+    f1.score <- performance(pred, "f")
     auc <- performance(pred,"auc")
     auc <- unlist(slot(auc, "y.values"))
-    return(list(auc=auc, pred=pred, perf=perf))
+    return(list(auc=auc, pred=pred, perf=perf, f1.score=f1.score))
     
   }
   
