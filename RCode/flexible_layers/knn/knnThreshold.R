@@ -16,9 +16,9 @@ use.dbank <- FALSE
 use.dtc <- FALSE
 
 data.bench <- DrugTargetsKNN(common.drugs, 
-                                      gmt.file.name, use.ctrpv2=use.ctrpv2,
-                                      use.clue=use.clue, use.chembl=use.chembl,
-                                      use.dbank=use.dbank, use.dtc=use.dtc) # 141 x 141 drug-drug adjacency matrix --> 141
+                             gmt.file.name, use.ctrpv2=use.ctrpv2,
+                             use.clue=use.clue, use.chembl=use.chembl,
+                             use.dbank=use.dbank, use.dtc=use.dtc) # 141 x 141 drug-drug adjacency matrix --> 141
 data.bench[] <- lapply(data.bench, as.character)
 
 num.targets <- length(unique(data.bench$TARGET_NAME))
@@ -35,7 +35,7 @@ colnames(counts) <- sort(unique(data.bench$TARGET_NAME))
 
 # Neighbours is a a matirx of the shape NUM_DRUGS X K. 
 # For example, a row looks like: Drug X     34 21 ... 10 4.
-k <- 9
+k <- 15
 neighbours <- matrix(0, nrow=length(drug.names), ncol=k)
 rownames(neighbours) <- drug.names
 
@@ -84,6 +84,11 @@ for (i in 1:nrow(neighbours)) {
         relevant.targets <- data.bench[data.bench$MOLECULE_NAME == neighbour.name, "TARGET_NAME"]
         counts[drug, relevant.targets] <- counts[drug, relevant.targets] + (1 * weights[i, j])
     }
+    
+    temp <- counts[drug, ]
+    temp.indices <- which(temp <= quantile(temp[temp > 0], 0))
+    counts[drug, temp.indices] <- 0
+    counts[drug, -temp.indices] <- 1
 }
 
 predicted.pairs <- melt(counts)
@@ -114,28 +119,9 @@ combined.indices <- union(predicted.indices, bench.indices)
 predicted.pairs <- predicted.pairs[combined.indices, ]
 bench.pairs <- bench.pairs[combined.indices, ]
 
-pairs.list <- list()
-
-pairs.list[["integrPairs"]] <- predicted.pairs
-pairs.list[["benchPairs"]] <- bench.pairs
-
-###### Code not yet adapted to KNN approach
-print("Benchmark obtained")
-
-print("Drug pairs obtained")
-res.target <- CompConcordIndxFlexible(pairs.list)
-
-perf.results <- predPerf(predicted.pairs$obs.integr, bench.pairs$bench)
-f1.scores <- perf.results$f1.score@y.values[[1]]
-f1.scores[1] <- 0
-best.index <- which(f1.scores == max(f1.scores))
-
-threshold <- perf.results$f1.score@x.values[[1]][best.index]
-
-predictions <- predicted.pairs
-predictions$obs.integr[predictions$obs.integr < threshold] <- 0
-predictions$obs.integr[predictions$obs.integr >= threshold] <- 1
-
-
-GenerateROCPlotFlexible(pairs.list, "temp_roc.pdf", length(drug.names))
+sensitivity(as.factor(predicted.pairs$obs.integr), as.factor(bench.pairs$bench), positive = "1")
+specificity(as.factor(predicted.pairs$obs.integr), as.factor(bench.pairs$bench), negative = "0")
+posPredValue(as.factor(predicted.pairs$obs.integr), as.factor(bench.pairs$bench), positive = "1")
+false.positives <- sum(predicted.pairs$obs.integr == 1 & bench.pairs$bench == 0)
+false.positives
 

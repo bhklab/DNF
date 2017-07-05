@@ -16,13 +16,14 @@ use.dbank <- FALSE
 use.dtc <- FALSE
 
 data.bench <- DrugTargetsKNN(common.drugs, 
-                                      gmt.file.name, use.ctrpv2=use.ctrpv2,
-                                      use.clue=use.clue, use.chembl=use.chembl,
-                                      use.dbank=use.dbank, use.dtc=use.dtc) # 141 x 141 drug-drug adjacency matrix --> 141
+                             gmt.file.name, use.ctrpv2=use.ctrpv2,
+                             use.clue=use.clue, use.chembl=use.chembl,
+                             use.dbank=use.dbank, use.dtc=use.dtc) # 141 x 141 drug-drug adjacency matrix --> 141
 data.bench[] <- lapply(data.bench, as.character)
 
 num.targets <- length(unique(data.bench$TARGET_NAME))
 drug.names <- sort(unique(data.bench$MOLECULE_NAME))
+target.names <- sort(unique(data.bench$TARGET_NAME))
 
 integrated <- integrated[drug.names, drug.names]
 
@@ -35,7 +36,7 @@ colnames(counts) <- sort(unique(data.bench$TARGET_NAME))
 
 # Neighbours is a a matirx of the shape NUM_DRUGS X K. 
 # For example, a row looks like: Drug X     34 21 ... 10 4.
-k <- 9
+k <- 5
 neighbours <- matrix(0, nrow=length(drug.names), ncol=k)
 rownames(neighbours) <- drug.names
 
@@ -83,59 +84,43 @@ for (i in 1:nrow(neighbours)) {
         
         relevant.targets <- data.bench[data.bench$MOLECULE_NAME == neighbour.name, "TARGET_NAME"]
         counts[drug, relevant.targets] <- counts[drug, relevant.targets] + (1 * weights[i, j])
+        #counts[drug, relevant.targets] <- counts[drug, relevant.targets] + 1
     }
 }
 
-predicted.pairs <- melt(counts)
-colnames(predicted.pairs)[1] <- "Var1"
-colnames(predicted.pairs)[2] <- "Var2"
-colnames(predicted.pairs)[3] <- "obs.integr"
-predicted.indices <- which(predicted.pairs$obs.integr > 0)
+top.predictions <- sapply(1:nrow(counts), function(i, target.names, drug.names) {
+    x <- counts[i, ]
+    index.of.predictions <- which(x > 0 & x > quantile(x[x > 0], 0.5))
+    res <- list()
+    res[[drug.names[i]]] <- x[index.of.predictions]
+    names(res[[drug.names[i]]]) <- target.names[index.of.predictions]
+    res
+}, target.names=colnames(counts), drug.names=rownames(counts))
 
-bench.pairs <- matrix(0, nrow=length(drug.names), ncol=num.targets)
-rownames(bench.pairs) <- drug.names
-colnames(bench.pairs) <- sort(unique(data.bench$TARGET_NAME))
+num.correct.predictions <- integer(nrow(counts))
+names(num.correct.predictions) <- rownames(counts)
+false.positive.targets <- integer(ncol(counts))
+names(false.positive.targets) <- colnames(counts)
 
-for (i in 1:nrow(bench.pairs)) {
-    drug.name <- rownames(bench.pairs)[i]
+for (i in 1:length(top.predictions)) {
+    drug.name <- names(top.predictions)[i]
+    target.names <- names(top.predictions[[i]])
     
-    relevant.targets <- data.bench[data.bench$MOLECULE_NAME == drug.name, "TARGET_NAME"]
+    possible.true.targets <- data.bench[data.bench$MOLECULE_NAME == drug.name, "TARGET_NAME"]
     
-    bench.pairs[drug.name, relevant.targets] <- 1
+    print(paste("Drug Name", drug.name, sep=": "))
+    print(paste("Predicted Targets", target.names, sep=": "))
+    print(paste("Possible Targets", possible.true.targets, sep=": "))
+    
+    if (length(intersect(target.names, possible.true.targets)) > 0) {
+        num.correct.predictions[drug.name] <- 1
+    }
+    
+    false.positives <- setdiff(target.names, possible.true.targets)
+    if (length(false.positives) > 0) {
+        false.positive.targets[false.positives] <- false.positive.targets[false.positives] + 1
+    }
 }
 
-bench.pairs <- melt(bench.pairs)
-colnames(bench.pairs)[1] <- "Var1"
-colnames(bench.pairs)[2] <- "Var2"
-colnames(bench.pairs)[3] <- "bench"
-bench.indices <- which(bench.pairs$bench > 0)
-
-combined.indices <- union(predicted.indices, bench.indices)
-predicted.pairs <- predicted.pairs[combined.indices, ]
-bench.pairs <- bench.pairs[combined.indices, ]
-
-pairs.list <- list()
-
-pairs.list[["integrPairs"]] <- predicted.pairs
-pairs.list[["benchPairs"]] <- bench.pairs
-
-###### Code not yet adapted to KNN approach
-print("Benchmark obtained")
-
-print("Drug pairs obtained")
-res.target <- CompConcordIndxFlexible(pairs.list)
-
-perf.results <- predPerf(predicted.pairs$obs.integr, bench.pairs$bench)
-f1.scores <- perf.results$f1.score@y.values[[1]]
-f1.scores[1] <- 0
-best.index <- which(f1.scores == max(f1.scores))
-
-threshold <- perf.results$f1.score@x.values[[1]][best.index]
-
-predictions <- predicted.pairs
-predictions$obs.integr[predictions$obs.integr < threshold] <- 0
-predictions$obs.integr[predictions$obs.integr >= threshold] <- 1
-
-
-GenerateROCPlotFlexible(pairs.list, "temp_roc.pdf", length(drug.names))
+accuracy <- sum(num.correct.predictions) / length(num.correct.predictions)
 

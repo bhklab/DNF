@@ -6,7 +6,9 @@ library(PharmacoGx)
 library(doParallel)
 library(fields)
 library(org.Hs.eg.db)
+library(foreach)
 
+source("RCode/flexible_layers/structureDataFlexible.R")
 source("RCode/value_inference_models/clustering_approach/clusteringImagingModelHelpers.R")
 source("RCode/flexible_layers/perturbationDataFlexible.R")
 source("RCode/meta_analysis/meta_analysis_helpers.R")
@@ -30,6 +32,25 @@ pert.data <- t(pert.data)
 
 imaging.data <- readRDS("Data/imaging_processed/imaging_subsetted_predictive_pca.RData")
 imaging.data <- t(imaging.data)
+
+fingerprints <- StructureDataFlexible(lincs.meta)
+df.fingerprints <- matrix(0, nrow=length(fingerprints), ncol=1024)
+
+c1 <- makeCluster(8)
+registerDoParallel(c1)
+stopCluster(c1)
+
+res <- foreach(i=1:nrow(df.fingerprints)) %dopar% {
+    placeholder <- numeric(1024)
+    fp <- fingerprints[[i]]
+    bits <- fp@bits
+
+    placeholder[bits] <- 1
+    placeholder
+}
+
+df.fingerprints <- matrix(unlist(res), nrow=length(res), byrow=T)
+rownames(df.fingerprints) <- names(fingerprints)
 
 datasets <- list(CCLE, gCSI, GDSC1000, CTRPv2, FIMM)
 
