@@ -1,7 +1,6 @@
 rm(list=ls())
 source("RCode/flexible_layers/drugTargetBenchFlexible.R")
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
-#old_data <- readRDS("Data/combined_sens_datasets_with.RData")
 
 imaging.meta <- read.delim("Data/Broad.HG005032.ProfilingData/imaging/cdrp.imaging.meta.cpd.txt", stringsAsFactors = FALSE)
 imaging <- read.delim("Data/Broad.HG005032.ProfilingData/imaging/cdrp.imaging.profiles.txt", stringsAsFactors = FALSE)
@@ -10,7 +9,7 @@ imaging <- read.delim("Data/Broad.HG005032.ProfilingData/imaging/cdrp.imaging.pr
 imaging.meta$name <- toupper(imaging.meta$name)
 imaging.meta$name <- gsub(badchars, "", imaging.meta$name)
 
-benchmark <- DrugTargetBenchFlexible(imaging.meta$name, "", use.ctrpv2=TRUE, use.clue=TRUE,
+benchmark <- DrugTargetBenchFlexible(imaging.meta$name, "temp_gmt", use.ctrpv2=TRUE, use.clue=TRUE,
                                      use.chembl=TRUE, use.dbank=TRUE, use.dtc=TRUE)
 
 imaging.meta <- imaging.meta[imaging.meta$name %in% colnames(benchmark), ]
@@ -30,13 +29,14 @@ imaging.subsetted <- imaging.subsetted[, colSums(is.na(imaging.subsetted)) != nr
 
 # Optional dimensionality reduction
 princ <- prcomp(imaging.subsetted)
-n.comp <- 20
+n.comp <- 50
 
 df.components <- predict(princ, newdata=imaging.subsetted)[,1:n.comp]
-set.seed(111)
+set.seed(500)
 df.components <- df.components[sample(1:nrow(df.components), 350), ] # take a smaller sample since computationally expensive to do 1000
+df.components <- scale(df.components)
 
 imaging.subsetted <- t(df.components)
 imaging.subsetted <- as.matrix(imaging.subsetted)
 
-saveRDS(imaging.subsetted, "Data/imaging_benchmark_pca.RData")
+saveRDS(imaging.subsetted, "Data/imaging_processed/imaging_benchmark_pca.RData")

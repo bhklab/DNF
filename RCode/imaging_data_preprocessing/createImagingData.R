@@ -58,6 +58,7 @@ princ <- prcomp(imaging.subsetted, scale=TRUE)
 n.comp <- 50
 
 df.components <- predict(princ, newdata=imaging.subsetted)[,1:n.comp]
+df.components <- scale(df.components)
 
 imaging.subsetted <- t(df.components)
 imaging.subsetted <- as.matrix(imaging.subsetted)
