@@ -1,6 +1,11 @@
 # Integrative pharmacogenomics to infer large-scale drug taxonomy 
 =================================================================
-Please cite: coming soon
+
+
+Please cite: Integrative Cancer Pharmacogenomics to Infer Large-Scale Drug Taxonomy.
+El-Hachem N, Gendoo DMA, Ghoraie LS, Safikhani Z, Smirnov P, Chung C, Deng K, Fang A, Birkwood E, Ho C, Isserlin R, Bader GD, Goldenberg A, Haibe-Kains B.
+Cancer Res. 2017 Jun 1;77(11):3057-3069. doi: 10.1158/0008-5472.CAN-17-0096. Epub 2017 Mar 17.
+PMID: 28314784
 
 This project assess the utility of data integration from multiple drug information layers.
 
