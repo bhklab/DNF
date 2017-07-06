@@ -1,6 +1,4 @@
 # Integrative pharmacogenomics to infer large-scale drug taxonomy 
-=================================================================
-
 
 Please cite: Integrative Cancer Pharmacogenomics to Infer Large-Scale Drug Taxonomy.
 El-Hachem N, Gendoo DMA, Ghoraie LS, Safikhani Z, Smirnov P, Chung C, Deng K, Fang A, Birkwood E, Ho C, Isserlin R, Bader GD, Goldenberg A, Haibe-Kains B.
