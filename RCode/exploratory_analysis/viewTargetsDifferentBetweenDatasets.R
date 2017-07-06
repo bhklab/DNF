@@ -12,7 +12,7 @@ source("RCode/exploratory_analysis/targetDiffHelpers.R")
 
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
 up <- UniProt.ws(taxId=9606)
-sensitivity.file.name <- "Data/combined_sens_adjusted_diag_inamedatasets_with.RData"
+sensitivity.file.name <- "Data/combined_sensitivity/combined_sens_iname_replaced.RData"
 sensitivity.data <- readRDS(sensitivity.file.name)
 cdrugs <- rownames(sensitivity.data)
 

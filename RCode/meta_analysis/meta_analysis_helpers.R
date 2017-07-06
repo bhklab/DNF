@@ -98,7 +98,7 @@ ReplaceDrugNamesManualCurationPertInames <- function(drug.names) {
     #   A vector of drug names, some of which have been replaced by the 
     #   correponding pert_iname of the L1000 dataset.
     #
-    manual.mapping <- read.csv("Data/mapping_manual_curation_inchikeys.csv")
+    manual.mapping <- read.csv("Data/manual_curation/mapping_manual_curation_inchikeys.csv")
     manual.mapping$drugnames <- toupper(manual.mapping$drugnames)
     manual.mapping$drugnames <- gsub(badchars, "", manual.mapping$drugnames)
     manual.mapping$pert_iname <- toupper(manual.mapping$pert_iname)
