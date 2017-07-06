@@ -15,8 +15,10 @@ Impact: Identifying mechanism for compounds with unknown MoA in early stages of 
 of sophisticated info (side effects or pharmacological indications...) 
 
 # Based on the method described in 
-http://www.ncbi.nlm.nih.gov/pubmed/24464287
-
+Similarity network fusion for aggregating data types on a genomic scale.
+Wang B, Mezlini AM, Demir F, Fiume M, Tu Z, Brudno M, Haibe-Kains B, Goldenberg A.
+Nat Methods. 2014 Mar;11(3):333-7. doi: 10.1038/nmeth.2810. Epub 2014 Jan 26.
+PMID: 24464287
 
 # Reproducibility of the Analysis 
 
