@@ -43,7 +43,7 @@ CreateAucsAll <- function(datasets, drugs, cell.lines, badchars) {
         aucs.all[paste(pSetName(datasets[[i]]), rownames(aucs), sep=":::"), colnames(aucs)] <- aucs
     }
     
-    aucs.all
+    t(aucs.all) # Num features X Num Drugs
 }
 
 ReplaceDrugNames <- function(drug.names, dataset) {
@@ -150,8 +150,8 @@ ComputeNumSamplesUsed <- function(aucs.all, aucs.cor) {
     # when computing aucs.cor.
     #
     # Args:
-    #   aucs.all: A matrix created using the CreateAucsAll function where rownames are of the 
-    #             form dataset_name:::drug_name and colnames are of the form cell_line_name.
+    #   aucs.all: A matrix created using the CreateAucsAll function where colnames are of the 
+    #             form dataset_name:::drug_name and rownames are of the form cell_line_name.
     #   aucs.cor: The correlation matrix computed from aucs.all where both rownames 
     #             and column names take the form dataset_name:::drug_name.
     #
@@ -159,14 +159,14 @@ ComputeNumSamplesUsed <- function(aucs.all, aucs.cor) {
     #   A matrix where each entry corresponds to the number of samples used to compute a
     #   correlation in aucs.cor at the same location. The rownames and colnames of this 
     #   matrix are identical to those of aucs.cor.
-    num.samples.used = matrix(0, nrow=base::nrow(aucs.all), ncol=base::nrow(aucs.all))
+    num.samples.used = matrix(0, nrow=base::ncol(aucs.all), ncol=base::ncol(aucs.all))
     dimnames(num.samples.used) <- dimnames(aucs.cor)
-    for (i in 1:base::nrow(aucs.all)) {
-        for (j in 1:base::nrow(aucs.all)) {
-            x = aucs.all[i,]
+    for (i in 1:base::ncol(aucs.all)) {
+        for (j in 1:base::ncol(aucs.all)) {
+            x = aucs.all[, i]
             x.len = length(x[!is.na(x)])
             
-            y = aucs.all[j, ]
+            y = aucs.all[, j]
             y.len = length(y[!is.na(y)])
             
             num.samples.used[i, j] = min(x.len, y.len)
@@ -208,8 +208,8 @@ CombineDrugCorrelations <- function(aucs.all, aucs.cor, aucs.cor2, aucs.dupl, da
     # it with drug y, we combine these 3 correlations into 1 using a Fisher Z transform.
     # 
     # Args:
-    #   aucs.all: A matrix created by using CreateAucsAll(). Rownames are of the form dataset_name:::drug_name
-    #             and colnames are of the form cell_line_name.
+    #   aucs.all: A matrix created by using CreateAucsAll(). Colnames are of the form dataset_name:::drug_name
+    #             and rownames are of the form cell_line_name.
     #   aucs.cor: The original correlation matrix whose rownames and colnames are 
     #             of the form dataset_name:::drug_name. This will be used to determine the 
     #             so-called self discrepancies which means the same drug correlated with itself 
@@ -236,7 +236,7 @@ CombineDrugCorrelations <- function(aucs.all, aucs.cor, aucs.cor2, aucs.dupl, da
     self.discrepancies <- list()
     for (i in 1:length(aucs.dupl)) {
         iix <- paste(sapply(datasets, pSetName), aucs.dupl[i], sep=":::")
-        iix <- intersect(iix, rownames(aucs.all))
+        iix <- intersect(iix, colnames(aucs.all))
         self.discrepancies[[i]] <- aucs.cor[iix, iix]
         
         ### Currently not doing anything about a drug with itself. I.e. drug1 in dataset 1 and 2,
@@ -281,8 +281,8 @@ CombineDiscrepancyCorrelations <- function(aucs.all, aucs.cor, aucs.cor2, aucs.d
     #
     #
     # Args:
-    #   aucs.all: A matrix created by using CreateAucsAll(). Rownames are of the form dataset_name:::drug_name
-    #             and colnames are of the form cell_line_name.
+    #   aucs.all: A matrix created by using CreateAucsAll(). Colnames are of the form dataset_name:::drug_name
+    #             and rownames are of the form cell_line_name.
     #   aucs.cor: The original correlation matrix whose rownames and colnames are 
     #             of the form dataset_name:::drug_name. This will be used to determine the 
     #             so-called self discrepancies which means the same drug correlated with itself 
@@ -305,7 +305,7 @@ CombineDiscrepancyCorrelations <- function(aucs.all, aucs.cor, aucs.cor2, aucs.d
     #
     for (i in 1:length(aucs.dupl)) {
         iix <- paste(sapply(datasets, pSetName), aucs.dupl[i], sep=":::")
-        iix <- intersect(iix, rownames(aucs.all))
+        iix <- intersect(iix, colnames(aucs.all))
         
         drug.name <- strsplit(iix[1], ":::")[[1]][2]
         

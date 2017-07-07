@@ -45,9 +45,11 @@ main <- function(datasets, save_dir) {
     ### and columns are cell lines
     aucs.all <- CreateAucsAll(datasets, drugs, cell.lines = cell.lines, badchars = badchars)
     
+    saveRDS(aucs.all, "Data/uploading_features/sensitivity/aucs_all.RData")
+    
     ### Calculate pearson correlation and zero out NA's. Note that zero 
     ### could be replaced with a more clever prior in the future.
-    aucs.cor <- cor(x=t(aucs.all), method="pearson", use="pairwise.complete.obs")
+    aucs.cor <- cor(x=aucs.all, method="pearson", use="pairwise.complete.obs")
     percentage.of.na <- sum(is.na(aucs.cor)) / (nrow(aucs.cor) * ncol(aucs.cor))
     print(paste("Percentage of NAs in correlation:", percentage.of.na, sep=" "))
     most.nas.for.any.drug <- max(colSums(is.na(aucs.cor)))
@@ -68,7 +70,7 @@ main <- function(datasets, save_dir) {
     ### due to the fact that use="pairwise.complete.obs" is being used
     num.samples.used = ComputeNumSamplesUsed(aucs.all, aucs.cor)
     
-    ### Compute fisher transformation of correlations in aucs.all
+    ### Compute fisher transformation of correlations in aucs.cor
     fisher.transformed <- fisherz(aucs.cor)
     
     ### Compute standard errors for aucs.all
@@ -92,6 +94,7 @@ main <- function(datasets, save_dir) {
     VisualizeDatasetDiscrepancies(dataset.pairs = dataset.pairs, unlisted.num.samples = unlisted.num.samples)   
     
     saveRDS(aucs.cor2, save_dir)
+    saveRDS(aucs.cor2, "Data/uploading_features/sensitivity/aucs_cor2.RData")
     
     self.discrepancies
 }
