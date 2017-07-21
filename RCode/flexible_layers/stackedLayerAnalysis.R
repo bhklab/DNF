@@ -19,7 +19,6 @@ source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
 source("RCode/flexible_layers/integrateLayersFlexible.R")
 source("RCode/flexible_layers/generateDrugPairsFlexible.R")
 source("RCode/flexible_layers/drugTargetBenchFlexible.R")
-source("RCode/flexible_layers/drugTargetBenchFlexibleProcessed.R")
 source("RCode/flexible_layers/compConcordIndxFlexible.R")
 source("RCode/flexible_layers/printCIndices.R")
 source("RCode/flexible_layers/printPVals.R")
@@ -58,8 +57,8 @@ sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replace
     
 res <- Main(use.sensitivity = TRUE, use.perturbation=TRUE, use.structure = TRUE, 
      use.imaging = FALSE, use.luminex = FALSE, sensitivity.file.name = sensitivity.file.name,
-     pert.file.name = pert.file.name, lincs.meta = lincs.meta, use.ctrpv2=FALSE,
-     use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=TRUE,
+     pert.file.name = pert.file.name, lincs.meta = lincs.meta, use.ctrpv2=TRUE,
+     use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE,
      create.communities=FALSE)
 
 Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, use.luminex, 

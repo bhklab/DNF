@@ -12,6 +12,45 @@
 
 DrugTargetBenchFlexible <- function(cdrugs, gmt_file_name="communities_flexible", use.ctrpv2=FALSE,
                                   use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
+    
+    drug.targets <- GetDrugTargetsFromDatasets(cdrugs=cdrugs, use.ctrpv2=use.ctrpv2, use.clue=use.clue,
+                                               use.chembl=use.chembl, use.dbank=use.dbank,
+                                               use.dtc=use.dtc)
+    
+    #Number of drugs with TARGETS: length(unique(chembl_Targets.common.all$MOLECULE_NAME))
+    drug.targets <- unique(drug.targets)
+    drug.targets <- drug.targets[!is.na(drug.targets[,2]),]
+    
+    ## create a gmt file from Target codes, each Target class contains a number of drugs
+    list.of.targs <- list()
+    for(targName in unique(drug.targets$TARGET_NAME)){
+        targGmt <- with(drug.targets, MOLECULE_NAME[TARGET_NAME==targName]) 
+        list.of.targs[[targName]] <- targGmt
+    }
+    ## filter out the targets common between more than 2 drugs
+    common.targs <- sapply(list.of.targs, function(x) length(x) >= 2)
+    GMT_TARG<- list.of.targs[common.targs]
+    save(GMT_TARG, file = paste(getwd(), gmt_file_name, sep="/"))
+    
+    ## Build an adjacency matrix target x drugs and keep only filtered targets in GMT file
+    ## data frame with 0/1
+    data.wide <- reshape2::dcast(drug.targets, TARGET_NAME ~ MOLECULE_NAME)
+    data.wide <- data.wide[data.wide$TARGET_NAME %in% names(GMT_TARG),, drop=F]
+    rownames(data.wide) <- data.wide[,1]
+    data.wide <- data.wide[,-1]
+    ## keep only filtered drugs in GMT file
+    ## only drugs with known target
+    data.wide <- data.wide[, colnames(data.wide) %in% unique(as.character(unlist(GMT_TARG))), drop=F] 
+    data.bench <- apply(data.wide, 2, function(x) ifelse(!is.na(x),1,0))
+    ## create a drug x drug adjacency matrix
+    data.bench <- as.matrix(proxy::simil(t(data.bench), method="Jaccard"))
+    data.bench <- apply(data.bench, 1, function(x) ifelse(x>0 | is.na(x),1,0))
+    
+    return(data.bench)
+}
+
+GetDrugTargetsFromDatasets <- function(cdrugs, use.ctrpv2=FALSE,
+                                use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
     drug.targets = data.frame(MOLECULE_NAME=character(0), TARGET_NAME=character(0))
     
     if (use.ctrpv2) {
@@ -87,37 +126,8 @@ DrugTargetBenchFlexible <- function(cdrugs, gmt_file_name="communities_flexible"
         
         drug.targets <- rbind.data.frame(drug.targets, drug.targetsAdditional, stringsAsFactors = FALSE)
     }
-    
-    #Number of drugs with TARGETS: length(unique(chembl_Targets.common.all$MOLECULE_NAME))
-    drug.targets <- unique(drug.targets)
-    drug.targets <- drug.targets[!is.na(drug.targets[,2]),]
-    
-    ## create a gmt file from Target codes, each Target class contains a number of drugs
-    list.of.targs <- list()
-    for(targName in unique(drug.targets$TARGET_NAME)){
-        targGmt <- with(drug.targets, MOLECULE_NAME[TARGET_NAME==targName]) 
-        list.of.targs[[targName]] <- targGmt
-    }
-    ## filter out the targets common between more than 2 drugs
-    common.targs <- sapply(list.of.targs, function(x) length(x) >= 2)
-    GMT_TARG<- list.of.targs[common.targs]
-    save(GMT_TARG, file = paste(getwd(), gmt_file_name, sep="/"))
-    
-    ## Build an adjacency matrix target x drugs and keep only filtered targets in GMT file
-    ## data frame with 0/1
-    data.wide <- reshape2::dcast(drug.targets, TARGET_NAME ~ MOLECULE_NAME)
-    data.wide <- data.wide[data.wide$TARGET_NAME %in% names(GMT_TARG),, drop=F]
-    rownames(data.wide) <- data.wide[,1]
-    data.wide <- data.wide[,-1]
-    ## keep only filtered drugs in GMT file
-    ## only drugs with known target
-    data.wide <- data.wide[, colnames(data.wide) %in% unique(as.character(unlist(GMT_TARG))), drop=F] 
-    data.bench <- apply(data.wide, 2, function(x) ifelse(!is.na(x),1,0))
-    ## create a drug x drug adjacency matrix
-    data.bench <- as.matrix(proxy::simil(t(data.bench), method="Jaccard"))
-    data.bench <- apply(data.bench, 1, function(x) ifelse(x>0 | is.na(x),1,0))
-    
-    return(data.bench)
+
+    drug.targets
 }
 
 
