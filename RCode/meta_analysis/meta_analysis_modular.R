@@ -28,11 +28,11 @@ datasets <- list(datasets_with_gdsc = datasets_with_gdsc)
 for (i in 1:length(datasets)) {
     temp <- strsplit(names(datasets)[i], '_')[[1]]
     save_dir <- paste('Data/combined_sensitivity/combined_sens_iname_replaced', temp[1], '_', temp[2], '.RData', sep="")
-    discrepancies <- main(datasets[[i]], save_dir = save_dir)
+    discrepancies <- Main(datasets[[i]], save_dir = save_dir)
     print(discrepancies)
 }
 
-main <- function(datasets, save_dir) {
+Main <- function(datasets, save_dir) {
     cell.lines <- sort(unique(unlist(sapply(datasets, function(x) { return (cellNames(x)) }))))
     drugs <- unique(unlist(sapply(datasets, 
                                   function(x) {
@@ -96,5 +96,5 @@ main <- function(datasets, save_dir) {
     saveRDS(aucs.cor2, save_dir)
     saveRDS(aucs.cor2, "Data/uploading_features/sensitivity/aucs_cor2.RData")
     
-    self.discrepancies
+    list(discrepancies=self.discrepancies, dataset.pairs=dataset.pairs)
 }

@@ -132,7 +132,8 @@ CreateFinalCorrelationWithoutDups <- function(aucs.cor, aucs.drugs) {
     #
     # Returns: 
     #   A correlation matrix without duplicated drug names. The correlations for 
-    #   duplicated drugs have not yet been combined at this point.
+    #   duplicated drugs have not yet been combined at this point. Drug names here
+    #   are no longer prepended with the dataset.
     aucs.drugs2 <- sort(unique(aucs.drugs))
     
     ### Create placeholder for final correlation matrix. Copy values from first correlation
