@@ -19,6 +19,7 @@ source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
 source("RCode/flexible_layers/integrateLayersFlexible.R")
 source("RCode/flexible_layers/generateDrugPairsFlexible.R")
 source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/flexible_layers/drugTargetBenchFlexibleProcessed.R")
 source("RCode/flexible_layers/compConcordIndxFlexible.R")
 source("RCode/flexible_layers/printCIndices.R")
 source("RCode/flexible_layers/printPVals.R")
@@ -57,13 +58,13 @@ sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replace
     
 res <- Main(use.sensitivity = TRUE, use.perturbation=TRUE, use.structure = TRUE, 
      use.imaging = FALSE, use.luminex = FALSE, sensitivity.file.name = sensitivity.file.name,
-     pert.file.name = pert.file.name, lincs.meta = lincs.meta, use.ctrpv2=TRUE,
-     use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE,
+     pert.file.name = pert.file.name, lincs.meta = lincs.meta, use.ctrpv2=FALSE,
+     use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=TRUE,
      create.communities=FALSE)
 
 Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, use.luminex, 
                  sensitivity.file.name="", pert.file.name="", lincs.meta=NULL,
-                 atc.benchmark.name="chembl-new", compute.atc=TRUE, use.ctrpv2=FALSE, use.clue=FALSE,
+                 atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
                  use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE) {
     target.roc.file.name <- CreateTargetROCFileName(sensitivity.file.name=sensitivity.file.name, 
                                        use.sensitivity=use.sensitivity,
@@ -112,6 +113,8 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
         colnames(pert.data) <- toupper(colnames(pert.data))
         colnames(pert.data) <- gsub(badchars, "", colnames(pert.data))
         pert.names <- colnames(pert.data)
+        
+        saveRDS(pert.data, "Data/uploading_features/perturbation/pert_features.RData")
     } else if (use.structure) {
         # If using the structure layer, use the pert_iname column from the LINCS
         # metadata file as the names to be intersected with the sensitivity layer.
@@ -159,6 +162,9 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
     if (use.structure) {
         strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
         length(strc.data)     
+        
+        saveRDS(strc.data, "Data/uploading_features/structure/structure_features.RData")
+        
         strc.aff.mat <- ConstStructureLayerFlexible(strc.data)
     }
     

@@ -16,6 +16,8 @@ ConstStructureLayerFlexible <-  function(targ.fps) {
     fp.sim <- fingerprint::fp.sim.matrix(targ.fps, method = "tanimoto")
     rownames(fp.sim) <- names(targ.fps)
     colnames(fp.sim) <- names(targ.fps)
+    
+    saveRDS(fp.sim, "Data/uploading_features/structure/structure_similarities.RData")
     ## Calculate affinity matrix (from generic distance) as described in SNFtool package with default values
     fp.aff <- SNFtool::affinityMatrix(1-fp.sim, 20, 0.5)
     return(fp.aff)
