@@ -188,11 +188,70 @@ GetTargetDiscrepanciesPathway <- function(d1, d2, common.drugs,
         # If no common pathway between the targets in dataset 1 and the targets in dataset 2
         # then add the current drug to the list of disagreeing drugs
         if (length(pathway.intersection) == 0) {
-            #discrepancy.counts[[pair.name]] <- c(discrepancy.counts[[pair.name]], drug.name)
-            discrepancy.counts[[pair.name]][[drug.name]] <- list(dataset.1.targets=)
+            discrepancy.counts[[pair.name]] <- c(discrepancy.counts[[pair.name]], drug.name)
+            # discrepancy.counts[[pair.name]][[drug.name]] <- list(dataset.1.targets=)
         }
     }
     
     discrepancy.counts
 }
 
+GetDrugBankGeneSymbols <- function(up, uniprot.ids) {
+    # Given a Uniprot.ws object, and a character vector of Uniprot (target) IDs,
+    # obtain the corresponding gene symbols for those Uniprot targets.
+    #
+    # Args:
+    #   up: A Uniprot.ws object having a homosapien taxID
+    #   unprot.ids: A character vector of Uniprot target IDs for which to obtain
+    #   gene symbols. This comes from the UniProt.ID column of the drugbank 
+    #   drug target dataset.
+    #
+    # Returns:
+    #   A character vector of gene symbols corresponding to the supplied Uniprot target IDs
+    
+    res <- select(up, keys = uniprot.ids, "GENES", "UNIPROTKB")    
+    splitted = strsplit(res$GENES, split=" ")
+    first.gene.names <- sapply(splitted, function(x) {x[1]})
+    
+    first.gene.names
+}
+
+GetCHEMBLGeneSymbols <- function(chembl.target.ids) {
+    # Given a character vector of chebml target IDs, query the chebml
+    # REST api to obtain the corresponding gene symbols for those target IDs.
+    #
+    # Args:
+    #   chebml.target.ids: A character vector of chembl target IDs from the TARGET_CHEMBL_ID
+    #   column of the chembl drug target dataset.
+    #
+    # Returns:
+    #   A character vector of gene symbols corresponding to the supplied chembl target IDs.
+    
+    gene.symbols <- character(length(chembl.target.ids))
+    
+    for (i in 1:length(chembl.target.ids)) {
+        id <- chembl.target.ids[i]
+        
+        if (is.na(id)) {
+            next()
+        }
+        
+        res <- fromJSON(paste("https://www.ebi.ac.uk/chembl/api/data/target/", id, sep=""))
+        
+        if (length(res$target_components) == 0) {
+            next()    
+        }
+        
+        synonyms <- res$target_components$target_component_synonyms[[1]]
+        synonyms <- synonyms[synonyms$syn_type == "GENE_SYMBOL", ]
+        print(synonyms)
+                
+        if (!(is.null(synonyms)) & nrow(synonyms) > 0) {
+            gene.symbols[i] <- synonyms[1, "component_synonym"]
+        }
+        
+        print(i)
+    }
+    
+    gene.symbols
+}

@@ -1,8 +1,13 @@
-imaging.subsetted <- readRDS("Data/imaging_subsetted.RData")
-imaging.subsetted <- t(imaging.subsetted)
+imaging.data <- read.delim("Data/Broad.HG005032.ProfilingData/imaging/cdrp.imaging.profiles.txt", stringsAsFactors = FALSE)
 
-random.sample <- sample(1:ncol(imaging.subsetted), 20, replace=FALSE)
-boxplot(imaging.subsetted[, random.sample])
+random.sample <- sample(1:ncol(imaging.data), 30, replace=FALSE)
+boxplot(imaging.data[, random.sample])
+
+colRamp <- colorRampPalette(c(3, "white", 2))(20)
+plot(density(imaging.data[, 2]), lwd=3, col=colRamp[1])
+
+imaging.data.scaled <- scale(imaging.data[, random.sample])
+imaging.data.scaled <- normalize.quantiles(as.matrix(imaging.data[, random.sample]))
 
 imaging.subsetted <- scale(imaging.subsetted)
 imaging.subsetted <- imaging.subsetted[, colSums(is.na(imaging.subsetted)) != nrow(imaging.subsetted)]
