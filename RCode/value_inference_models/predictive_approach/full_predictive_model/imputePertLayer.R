@@ -13,10 +13,10 @@ impute.lincs.meta$pert_iname <- gsub(badchars, "", impute.lincs.meta$pert_iname)
 pert.file.name <- "Data/L1000_compound_signatures.RData"
 impute.df.pert <- CreatePerturbationFeatures(pert.file.name, badchars)
 
-predicted.perturbation.features <- readRDS("pred_pert_features_sens.RData")
+predicted.perturbation.features <- readRDS("Data/predicted_features/pred_pert_features_using_sens_only.RData")
 
 df.pert.imputed <- impute.df.pert
 df.pert.imputed[rownames(predicted.perturbation.features), ] <- predicted.perturbation.features
 df.pert.imputed <- t(df.pert.imputed)
 
-saveRDS(df.pert.imputed, "pert_data_imputed_sens.RData")
+saveRDS(df.pert.imputed, "Data/predicted_features/augmented_pert_features_25_drugs.RData")
