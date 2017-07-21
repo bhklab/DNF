@@ -1,5 +1,6 @@
 rm(list=ls())
 
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
 source("RCode/flexible_layers/knn/drugTargetsKNN.R")
 source("RCode/flexible_layers/compConcordIndxFlexible.R")
 source("RCode/flexible_layers/generateROCPlotFlexible.R")
@@ -36,7 +37,7 @@ colnames(counts) <- sort(unique(data.bench$TARGET_NAME))
 
 # Neighbours is a a matirx of the shape NUM_DRUGS X K. 
 # For example, a row looks like: Drug X     34 21 ... 10 4.
-k <- 5
+k <- 7
 neighbours <- matrix(0, nrow=length(drug.names), ncol=k)
 rownames(neighbours) <- drug.names
 
@@ -79,18 +80,33 @@ for (i in 1:nrow(neighbours)) {
     drug <- rownames(neighbours)[i]
     names.of.neighbours <- neighbours[i, ]
     
+    max.x <- max(weights[i, ])
+    fudge.factor <- - ((log(3)) / ((weights[i, ncol(weights) - 1] - weights[i, ncol(weights)]))) + 0.001
+    sigmoid <- function(z) {1 / (1 + exp(- fudge.factor * (z - max.x)))}
+    
     for (j in 1:length(names.of.neighbours)) {
         neighbour.name <- names.of.neighbours[j]
         
         relevant.targets <- data.bench[data.bench$MOLECULE_NAME == neighbour.name, "TARGET_NAME"]
-        counts[drug, relevant.targets] <- counts[drug, relevant.targets] + (1 * weights[i, j])
+        counts[drug, relevant.targets] <- counts[drug, relevant.targets] + (sigmoid(weights[i, j]))
         #counts[drug, relevant.targets] <- counts[drug, relevant.targets] + 1
     }
 }
 
+counts <- apply(counts, 1, function(x) {
+    indices <- which(x > 0)
+    res <- numeric(length(x))
+    res[indices] <- exp(x[indices]) / sum(exp(x[indices]))
+    res
+})
+
+counts <- t(counts)
+colnames(counts) <- sort(unique(data.bench$TARGET_NAME))
+
 top.predictions <- sapply(1:nrow(counts), function(i, target.names, drug.names) {
     x <- counts[i, ]
-    index.of.predictions <- which(x > 0 & x > quantile(x[x > 0], 0.5))
+    sorted <- sort(x, index.return=T)
+    index.of.predictions <- tail(sorted$ix[sorted$x > 0], 5)
     res <- list()
     res[[drug.names[i]]] <- x[index.of.predictions]
     names(res[[drug.names[i]]]) <- target.names[index.of.predictions]
