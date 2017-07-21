@@ -34,26 +34,15 @@ DrugTargetBenchFlexible <- function(cdrugs, gmt_file_name="communities_flexible"
     
     if (use.chembl) {
         ## read CHEMBL drug file downloaded from Chembl website
-        chembl.drug.targs <- read.delim("Data/chembl_drugtargets-16_5-10-02.txt", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
-        chembl.drug.targs <- chembl.drug.targs[,c("MOLECULE_NAME", "TARGET_NAME")]
-        ## remove badchar from Chembl and common drug file + capitalize 
-        chembl.drug.targs[,1] <- gsub(badchars, "",  chembl.drug.targs[,1])
-        chembl.drug.targs[,1] <- toupper(chembl.drug.targs[,1])
-        
+        chembl.drug.targs <- read.csv("Data/target_datasets_processed/chembl_drug_targets.csv", stringsAsFactors=F)
         chembl.drug.targs <- chembl.drug.targs[chembl.drug.targs$MOLECULE_NAME %in% cdrugs,]
-        chembl.drug.targs <- chembl.drug.targs[chembl.drug.targs[,1] %in% cdrugs,]
         
         drug.targets <- rbind.data.frame(drug.targets, chembl.drug.targs, stringsAsFactors = FALSE)
     }
     
     if (use.dbank) {
         ## Drug bank targets
-        dbank.drug.targs <- read.csv("./Data/uniprot links.csv", stringsAsFactor=F, na.strings=c("", "NA")) #2043 entries
-        uniprot.targs <- dbank.drug.targs[,c("Name", "UniProt.Name")]
-        colnames(uniprot.targs) <-  c("MOLECULE_NAME","TARGET_NAME")
-        ## remove badchar from Chembl and common drug file + capitalize 
-        uniprot.targs[,1] <- toupper(uniprot.targs[,1])
-        uniprot.targs[,1] <- gsub(badchars, "",  uniprot.targs[,1])
+        uniprot.targs <- read.csv("Data/target_datasets_processed/drug_bank_targets.csv", stringsAsFactors=F)
         uniprot.targs <- uniprot.targs[uniprot.targs[,1] %in% cdrugs,]
         
         drug.targets <- rbind.data.frame(drug.targets, uniprot.targs, stringsAsFactors = FALSE)
