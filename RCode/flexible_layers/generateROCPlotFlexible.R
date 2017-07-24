@@ -31,8 +31,9 @@ GenerateROCPlotFlexible <- function(allPairs, file.name, num.drugs) {
         }
     }
 
+    # windows(width = 5, height = 5)
     # changing params for the ROC plot - width, etc
-    pdf(file.name, width=5, height = 5)
+    # pdf(file.name, width=5, height = 5)
     par(mar=c(5,5,2,2), xaxs = "i", yaxs = "i", cex.axis=1.3, cex.lab=1.4)
     
     aucs.list <- list()
@@ -64,5 +65,7 @@ GenerateROCPlotFlexible <- function(allPairs, file.name, num.drugs) {
     title(paste("AUC Benchmark Number of Drugs: ", num.drugs, sep=" "))
     
     abline(0,1, col = "gray")
-    dev.off()
+    # dev.off()
+    dev.copy2pdf(file=file.name, width=5, height=5)
+    # dev.off()
 }

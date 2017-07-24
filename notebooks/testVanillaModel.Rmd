@@ -1,0 +1,84 @@
+---
+title: "Test Vanilla Model"
+output:
+  html_document: default
+  html_notebook: default
+---
+In this notebook, we show the performance of the vanilla model with 3 layers (where sensitivity datsets have been combined into a single matrix to increase overlap). This is essentially the new benchmark to beat in terms of auc.
+
+In order not to lose our sanity with the relative file paths that rmd chooses to employ, let's set the root directory of this project
+
+```{r setup}
+knitr::opts_knit$set(root.dir = normalizePath('..'))
+getwd()
+```
+
+
+We start by importing the necessary functions
+
+```{r}
+rm(list=ls())
+
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/luminexDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+source("RCode/flexible_layers/constLuminexLayerFlexible.R")
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+
+source("RCode/flexible_layers/integrateLayersFlexible.R")
+source("RCode/flexible_layers/generateDrugPairsFlexible.R")
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/flexible_layers/compConcordIndxFlexible.R")
+source("RCode/flexible_layers/printCIndices.R")
+source("RCode/flexible_layers/printPVals.R")
+source("RCode/flexible_layers/generateROCPlotFlexible.R")
+source("RCode/flexible_layers/atcBenchFlexible.R")
+source("RCode/flexible_layers/compDrugTargetBenchmarkFlexible.R")
+source("RCode/flexible_layers/computeATCBenchmarkFlexible.R")
+source("RCode/flexible_layers/stackedLayerAnalysisHelpers.R")
+source("RCode/flexible_layers/communityGenFlexible.R")
+
+source("RCode/cindexComp2.R")
+source("RCode/predPerf.R")
+
+library(PharmacoGx)
+library(apcluster)
+library(rcdk)
+library(fingerprint)
+library(annotate)
+library(org.Hs.eg.db)
+library(SNFtool)
+library(ROCR)
+library(survcomp)
+library(reshape2)
+library(proxy)
+library(PRROC)
+library(apcluster)
+
+# Load lincs metadata and clean the pert_inames in it
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+
+pert.file.name <- "Data/L1000_compound_signatures.RData"
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+source("RCode/flexible_layers/stackedLayerAnalysis.R")
+```
+
+
+We begin with evaluating the performance of our model on the ctrpv2 dataset.
+```{r}
+res <- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
+            use.imaging=FALSE, use.luminex=FALSE, 
+             sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
+            lincs.meta=lincs.meta,
+             atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
+             use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex")
+```

@@ -1,0 +1,96 @@
+---
+title: "Creating Pert Similarities"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+We begin by loading in the signatures file which contains a list of signatures.
+
+```{r}
+signatures <- readRDS("../Data/signatures.RData")
+```
+
+Now we need to concatenate these signatures into a matrix for each drug
+
+```{r}
+concatenated.signatures <- list()
+
+for (cell.line in names(signatures)) {
+    cell.line.signatures <- signatures[[cell.line]][, , "estimate"]
+    
+    for (drug in colnames(cell.line.signatures)) {
+        if (is.null(concatenated.signatures[[drug]])) {
+            concatenated.signatures[[drug]] <- cell.line.signatures[, drug]
+        } else {
+            concatenated.signatures[[drug]] <- rbind(concatenated.signatures[[drug]], cell.line.signatures[, drug])
+        }
+    }
+}
+```
+
+
+```{r}
+
+concatenated.signatures <- list()
+
+for (cell.line in names(signatures)) {
+    cell.line.signatures <- signatures[[cell.line]][, , "estimate"]
+    
+    for (drug in colnames(cell.line.signatures)) {
+        if (is.null(concatenated.signatures[[drug]])) {
+            concatenated.signatures[[drug]] <- cell.line.signatures[, drug]
+        } else {
+            concatenated.signatures[[drug]] <- c(concatenated.signatures[[drug]], cell.line.signatures[, drug])
+        }
+    }
+}
+```
+
+So `concatenated.signatures` is a list of vectors where each vector is a bunch of pert sigs concatenated together
+
+Let's first get rid of the drugs that don't have signatures in every cell line
+
+```{r}
+temp <- unlist(lapply(concatenated.signatures, length))
+drugs.to.remove <- which(temp != 10539)
+
+concatenated.signatures <- concatenated.signatures[-drugs.to.remove]
+```
+
+Now to stack all the concatenaed signatures in a single matrix. Take transpose so drugs become columns.
+
+```{r}
+concatenated.signatures <- do.call(rbind, concatenated.signatures)
+concatenated.signatures <- t(concatenated.signatures)
+```
+
+Lastly, we compute the actual correlations
+
+```{r}
+drug.correlations <- cor(concatenated.signatures, method="pearson", use="pairwise.complete.obs")
+```
+
+Finally, we replace the pert ids with pert inames
+
+```{r}
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+lincs.meta <- read.csv("../Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+
+relevant.indices <- match(colnames(drug.correlations), lincs.meta$pert_id)
+drug.names <- lincs.meta$pert_iname[relevant.indices]
+
+colnames(drug.correlations) <- drug.names
+rownames(drug.correlations) <- drug.names
+
+drug.correlations <- drug.correlations[order(rownames(drug.correlations)), order(colnames(drug.correlations))]
+```
+
+Last but not least, we save the resulting matrix to file
+
+```{r}
+saveRDS(drug.correlations, "../Data/pert_sigs_6_hour/pert_correlations.RData")
+```
+

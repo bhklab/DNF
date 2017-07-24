@@ -1,6 +1,4 @@
-CreateBaseFileName <- function() {
-    base.dir <- "Output/auc_p_flex"
-    
+CreateBaseFileName <- function(base.dir) {
     if(!file.exists(base.dir)) {
         dir.create(base.dir)
     }
@@ -62,11 +60,11 @@ AddDrugTargetBenchmarksToFileName <- function(file.name, use.ctrpv2, use.clue, u
     file.name
 }
 
-CreateTargetROCFileName <- function(sensitivity.file.name="", use.sensitivity=FALSE,
+CreateTargetROCFileName <- function(base.dir="", sensitivity.file.name="", use.sensitivity=FALSE,
                               use.perturbation=FALSE, use.structure=FALSE, use.luminex=FALSE,
                               use.imaging=FALSE, use.ctrpv2=FALSE, use.clue=FALSE,
                               use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
-    file.name <- CreateBaseFileName()
+    file.name <- CreateBaseFileName(base.dir)
     file.name <- AddLayersToFileName(file.name=file.name, sensitivity.file.name=sensitivity.file.name,
                                      use.sensitivity=use.sensitivity, use.perturbation=use.perturbation,
                                      use.structure=use.structure, use.luminex=use.luminex,
@@ -80,11 +78,11 @@ CreateTargetROCFileName <- function(sensitivity.file.name="", use.sensitivity=FA
     file.name <- paste(file.name, "pdf", sep=".")
 }
 
-CreateATCROCFileName <- function(sensitivity.file.name="", atc.benchmark.name="",
+CreateATCROCFileName <- function(base.dir="", sensitivity.file.name="", atc.benchmark.name="",
                                  use.sensitivity=FALSE,
                                  use.perturbation=FALSE, use.structure=FALSE, use.luminex=FALSE,
                                  use.imaging=FALSE) {
-    file.name <- CreateBaseFileName()
+    file.name <- CreateBaseFileName(base.dir)
     
     file.name <- AddLayersToFileName(file.name=file.name, sensitivity.file.name=sensitivity.file.name,
                                      use.sensitivity=use.sensitivity, use.perturbation=use.perturbation,
@@ -97,11 +95,11 @@ CreateATCROCFileName <- function(sensitivity.file.name="", atc.benchmark.name=""
     file.name <- paste(file.name, "pdf", sep=".")
 }
 
-CreateGMTFileName <- function(use.sensitivity=FALSE,
+CreateGMTFileName <- function(base.dir="", use.sensitivity=FALSE,
                               use.perturbation=FALSE, use.structure=FALSE, use.luminex=FALSE,
                               use.imaging=FALSE, use.ctrpv2=FALSE, use.clue=FALSE,
                               use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
-    file.name <- CreateBaseFileName()
+    file.name <- CreateBaseFileName(base.dir)
     
     file.name <- paste(file.name, "communities", sep="")
     

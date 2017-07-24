@@ -1,71 +1,12 @@
 # This script is similar to the main-ctrpv-lincs.R script in the original version of DNF except that
 # it is flexible in terms of what layers are being used. Arbitrary combinations of layers, as well
 # as arbitrary combinations of drug target datasets can be used in the analysis.
-
-rm(list=ls())
-
-source("RCode/flexible_layers/structureDataFlexible.R")
-source("RCode/flexible_layers/sensitivityDataFlexible.R")
-source("RCode/flexible_layers/perturbationDataFlexible.R")
-source("RCode/flexible_layers/luminexDataFlexible.R")
-source("RCode/flexible_layers/imagingDataFlexible.R")
-
-source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
-source("RCode/flexible_layers/constStructureLayerFlexible.R")
-source("RCode/flexible_layers/constLuminexLayerFlexible.R")
-source("RCode/flexible_layers/constImagingLayerFlexible.R")
-source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
-
-source("RCode/flexible_layers/integrateLayersFlexible.R")
-source("RCode/flexible_layers/generateDrugPairsFlexible.R")
-source("RCode/flexible_layers/drugTargetBenchFlexible.R")
-source("RCode/flexible_layers/compConcordIndxFlexible.R")
-source("RCode/flexible_layers/printCIndices.R")
-source("RCode/flexible_layers/printPVals.R")
-source("RCode/flexible_layers/generateROCPlotFlexible.R")
-source("RCode/flexible_layers/atcBenchFlexible.R")
-source("RCode/flexible_layers/compDrugTargetBenchmarkFlexible.R")
-source("RCode/flexible_layers/computeATCBenchmarkFlexible.R")
-source("RCode/flexible_layers/stackedLayerAnalysisHelpers.R")
-source("RCode/flexible_layers/communityGenFlexible.R")
-
-source("RCode/cindexComp2.R")
-source("RCode/predPerf.R")
-
-library(PharmacoGx)
-library(apcluster)
-library(rcdk)
-library(fingerprint)
-library(annotate)
-library(org.Hs.eg.db)
-library(SNFtool)
-library(ROCR)
-library(survcomp)
-library(reshape2)
-library(proxy)
-library(PRROC)
-library(apcluster)
-
-# Load lincs metadata and clean the pert_inames in it
-badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
-lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
-lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
-lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
-
-pert.file.name <- "Data/L1000_compound_signatures.RData"
-sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
-    
-res <- Main(use.sensitivity = TRUE, use.perturbation=TRUE, use.structure = TRUE, 
-     use.imaging = FALSE, use.luminex = FALSE, sensitivity.file.name = sensitivity.file.name,
-     pert.file.name = pert.file.name, lincs.meta = lincs.meta, use.ctrpv2=TRUE,
-     use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE,
-     create.communities=FALSE)
-
-Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, use.luminex, 
+EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, use.luminex, 
                  sensitivity.file.name="", pert.file.name="", lincs.meta=NULL,
                  atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
-                 use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE) {
-    target.roc.file.name <- CreateTargetROCFileName(sensitivity.file.name=sensitivity.file.name, 
+                 use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, 
+                 base.dir="") {
+    target.roc.file.name <- CreateTargetROCFileName(base.dir=base.dir, sensitivity.file.name=sensitivity.file.name, 
                                        use.sensitivity=use.sensitivity,
                                        use.perturbation=use.perturbation, use.structure=use.structure,
                                        use.luminex=use.luminex, use.imaging=use.imaging,
@@ -73,12 +14,12 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
                                        use.clue=use.clue, use.chembl=use.chembl, use.dbank=use.dbank,
                                        use.dtc=use.dtc)
     
-    atc.roc.file.name <- CreateATCROCFileName(sensitivity.file.name=sensitivity.file.name, 
+    atc.roc.file.name <- CreateATCROCFileName(base.dir=base.dir, sensitivity.file.name=sensitivity.file.name, 
                                            atc.benchmark.name=atc.benchmark.name, use.sensitivity=use.sensitivity,
                                            use.perturbation=use.perturbation, use.structure=use.structure,
                                            use.luminex=use.luminex, use.imaging=use.imaging)
     
-    gmt.file.name <- CreateGMTFileName(use.sensitivity=use.sensitivity,
+    gmt.file.name <- CreateGMTFileName(base.dir=base.dir, use.sensitivity=use.sensitivity,
                                        use.perturbation=use.perturbation, use.structure=use.structure,
                                        use.luminex=use.luminex, use.imaging=use.imaging,
                                        use.ctrpv2=use.ctrpv2,
@@ -104,16 +45,19 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
     }
 
     if (use.perturbation) {
+        # pert.data <- readRDS("Data/pert_sigs_6_hour/pert_correlations.RData")
+        # pert.names <- colnames(pert.data)
         # If using the perturbation layer, use the names from the signature
         # file as the names to be intersected with the sensitivity layer
         pert.data <- PerturbationDataFlexible(pert.file.name, lincs.meta)  ## 978 X 239
-        print(dim(pert.data)) # 978 x 237 for         
-        
+        print(dim(pert.data)) # 978 x 237 for
+
         colnames(pert.data) <- toupper(colnames(pert.data))
         colnames(pert.data) <- gsub(badchars, "", colnames(pert.data))
         pert.names <- colnames(pert.data)
+
+        # saveRDS(pert.data, "Data/uploading_features/perturbation/pert_features.RData")
         
-        saveRDS(pert.data, "Data/uploading_features/perturbation/pert_features.RData")
     } else if (use.structure) {
         # If using the structure layer, use the pert_iname column from the LINCS
         # metadata file as the names to be intersected with the sensitivity layer.
@@ -138,7 +82,9 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
     layers <- list(sens.names = sort(colnames(sens.data)), pert.names=pert.names,
                    luminex.names = sort(colnames(luminex.data)), imaging.names = sort(colnames(imaging.data)))
     common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+    # common.drugs <- readRDS("common_drugs.RData")
     print(length(common.drugs))
+    
     
     # Subset the datasets for the different layers based on common drugs
     sens.data <- sens.data[common.drugs, common.drugs] # 645 x 239 drugs
@@ -162,7 +108,7 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
         strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
         length(strc.data)     
         
-        saveRDS(strc.data, "Data/uploading_features/structure/structure_features.RData")
+        # saveRDS(strc.data, "Data/uploading_features/structure/structure_features.RData")
         
         strc.aff.mat <- ConstStructureLayerFlexible(strc.data)
     }
@@ -173,6 +119,8 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
     
     if (use.perturbation) {
         pert.aff.mat <- ConstPerturbationLayerFlexible(pert.data)
+        # pert.cor <- pert.data
+        # pert.aff.mat <- SNFtool::affinityMatrix(1-pert.cor, 20, 0.5)
     }
     
     if (use.luminex) {
@@ -187,7 +135,7 @@ Main <- function(use.sensitivity, use.perturbation, use.structure, use.imaging, 
     integrated <- IntegrateLayersFlexible(sens.aff=sens.aff.mat, strc.aff=strc.aff.mat, pert.aff=pert.aff.mat, 
                                           luminex.aff=luminex.aff.mat, imaging.aff=imaging.aff.mat)
     
-    saveRDS(integrated, "integrated.RData")
+    # saveRDS(integrated, "integrated.RData")
     print("Integration done")
     
     # Compute P-Values and create an AUC plot for the drug target benchmark
