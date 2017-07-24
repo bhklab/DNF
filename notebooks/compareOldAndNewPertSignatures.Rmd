@@ -1,14 +1,10 @@
 ---
-title: "Test Vanilla Model"
+title: "Compare Old And New Pert Signatures"
 output:
   html_document: default
   html_notebook: default
 ---
-## Description
-
-In this notebook, we show the performance of the vanilla model with 3 layers (where sensitivity datsets have been combined into a single matrix to increase overlap). This is essentially the new benchmark to beat in terms of auc. We will evaluate the performance on the various drug target datasets. We ignore dtc for now since it's not very specific.
-
-## Code
+In this notebook, we show the performance of the vanilla model with 3 layers (where sensitivity datsets have been combined into a single matrix to increase overlap). This is essentially the new benchmark to beat in terms of auc.
 
 In order not to lose our sanity with the relative file paths that rmd chooses to employ, let's set the root directory of this project
 
@@ -75,49 +71,62 @@ lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
 pert.file.name <- "Data/L1000_compound_signatures.RData"
 sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
 source("RCode/flexible_layers/stackedLayerAnalysis.R")
+#  Drugs that are common between new signatures and sens data. This is needed to compare apples with apples
+# in terms having benchmarks that include the same drugs in them.
+common.drugs <- readRDS("common_drugs.RData") 
 ```
 
 
-We begin with evaluating the performance of our model on the ctrpv2 dataset.
+We begin with evaluating the performance of our model on the ctrpv2 dataset. Only 138 drugs since some were missing in the new pert signatures. HEre is performance using old signatures, but subsetted to only the drugs that are also in the new signatures so we compare apples with apples.
+
 ```{r, fig.width=5, fig.height=5}
+pert.file.name <- "Data/L1000_compound_signatures.RData"
 res <- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
             use.imaging=FALSE, use.luminex=FALSE, 
              sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
             lincs.meta=lincs.meta,
              atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
-             use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=FALSE)
+             use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=FALSE, common.drugs=common.drugs)
 ```
 
-
-Now to look at the performance on the clue.io dataset
+Here is the performance on those same drugs but now using the new signatures.
 
 ```{r, fig.width=5, fig.height=5}
+pert.file.name <- "Data/pert_sigs_6_hour/pert_features_full.RData"
 res <- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
             use.imaging=FALSE, use.luminex=FALSE, 
              sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
             lincs.meta=lincs.meta,
-             atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=FALSE, use.clue=TRUE,
-             use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=FALSE)
+             atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
+             use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=TRUE, common.drugs=common.drugs)
 ```
 
-Now we look at the performance on the chembl dataset
+Now we move on to using a merged drug target dataset of both clue, ctrp, and chembl. The hope is that the increase in performance is more apparent since the sensitivity layer won't be so strong.
+
+First, the old signatures.
 
 ```{r, fig.width=5, fig.height=5}
+pert.file.name <- "Data/L1000_compound_signatures.RData"
 res <- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
             use.imaging=FALSE, use.luminex=FALSE, 
              sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
             lincs.meta=lincs.meta,
-             atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=FALSE, use.clue=FALSE,
-             use.chembl=TRUE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=FALSE)
+             atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=TRUE,
+             use.chembl=TRUE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=FALSE, common.drugs=common.drugs)
 ```
 
-Finally, we look at the performance on the drug bank dataset
+Now, the new signatures
 
 ```{r, fig.width=5, fig.height=5}
+pert.file.name <- "Data/pert_sigs_6_hour/pert_features_full.RData"
 res <- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
             use.imaging=FALSE, use.luminex=FALSE, 
              sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
             lincs.meta=lincs.meta,
-             atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=FALSE, use.clue=FALSE,
-             use.chembl=FALSE, use.dbank=TRUE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=FALSE)
+             atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=TRUE,
+             use.chembl=TRUE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=TRUE, common.drugs=common.drugs)
 ```
+
+
+
+

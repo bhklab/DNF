@@ -1,36 +1,25 @@
 ---
-title: "Creating Pert Similarities"
+title: "Creating Pert Similarities Vector Based Correlation"
 output:
   html_document: default
   html_notebook: default
 ---
 
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath(".."))
+```
+
+
 We begin by loading in the signatures file which contains a list of signatures.
 
 ```{r}
-signatures <- readRDS("../Data/signatures.RData")
+rm(list=ls())
+signatures <- readRDS("Data/signatures.RData")
 ```
 
 Now we need to concatenate these signatures into a matrix for each drug
 
 ```{r}
-concatenated.signatures <- list()
-
-for (cell.line in names(signatures)) {
-    cell.line.signatures <- signatures[[cell.line]][, , "estimate"]
-    
-    for (drug in colnames(cell.line.signatures)) {
-        if (is.null(concatenated.signatures[[drug]])) {
-            concatenated.signatures[[drug]] <- cell.line.signatures[, drug]
-        } else {
-            concatenated.signatures[[drug]] <- rbind(concatenated.signatures[[drug]], cell.line.signatures[, drug])
-        }
-    }
-}
-```
-
-
-```{r}
 
 concatenated.signatures <- list()
 
@@ -40,8 +29,11 @@ for (cell.line in names(signatures)) {
     for (drug in colnames(cell.line.signatures)) {
         if (is.null(concatenated.signatures[[drug]])) {
             concatenated.signatures[[drug]] <- cell.line.signatures[, drug]
+            names(concatenated.signatures[[drug]]) <- paste(cell.line, names(concatenated.signatures[[drug]]), sep=":::")
         } else {
-            concatenated.signatures[[drug]] <- c(concatenated.signatures[[drug]], cell.line.signatures[, drug])
+            temp <- cell.line.signatures[, drug]
+            names(temp) <- paste(cell.line, names(temp), sep=":::")
+            concatenated.signatures[[drug]] <- c(concatenated.signatures[[drug]], temp)
         }
     }
 }
@@ -49,33 +41,58 @@ for (cell.line in names(signatures)) {
 
 So `concatenated.signatures` is a list of vectors where each vector is a bunch of pert sigs concatenated together
 
-Let's first get rid of the drugs that don't have signatures in every cell line
 
 ```{r}
-temp <- unlist(lapply(concatenated.signatures, length))
-drugs.to.remove <- which(temp != 10539)
+signature.sizes <- lapply(concatenated.signatures, length)
+max.length <- Reduce(max, signature.sizes)
+placeholder <- matrix(NA, nrow=max.length, ncol=length(concatenated.signatures))
+colnames(placeholder) <- names(concatenated.signatures)
 
-concatenated.signatures <- concatenated.signatures[-drugs.to.remove]
+all.cell.gene.combos <- c()
+
+for (cell.line in names(signatures)) { 
+    gene.names <- rownames(signatures[[cell.line]][, , "estimate"])
+    
+    all.cell.gene.combos <- c(all.cell.gene.combos, paste(cell.line, gene.names, sep=":::"))
+}
+
+rownames(placeholder) <- all.cell.gene.combos
+
+for (drug in names(concatenated.signatures)) {
+    sig <- concatenated.signatures[[drug]]
+    
+    placeholder[names(sig), drug] <- sig
+}
 ```
-
-Now to stack all the concatenaed signatures in a single matrix. Take transpose so drugs become columns.
 
 ```{r}
-concatenated.signatures <- do.call(rbind, concatenated.signatures)
-concatenated.signatures <- t(concatenated.signatures)
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+
+relevant.indices <- match(colnames(placeholder), lincs.meta$pert_id)
+drug.names <- lincs.meta$pert_iname[relevant.indices]
+
+colnames(placeholder) <- drug.names
+
+placeholder <- placeholder[, order(colnames(placeholder))]
+
+saveRDS(placeholder, "Data/pert_sigs_6_hour/pert_features_full.RData")
 ```
+
 
 Lastly, we compute the actual correlations
 
 ```{r}
-drug.correlations <- cor(concatenated.signatures, method="pearson", use="pairwise.complete.obs")
+drug.correlations <- cor(placeholder, method="pearson", use="pairwise.complete.obs")
 ```
 
 Finally, we replace the pert ids with pert inames
 
 ```{r}
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
-lincs.meta <- read.csv("../Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
 lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
 lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
 
@@ -91,6 +108,6 @@ drug.correlations <- drug.correlations[order(rownames(drug.correlations)), order
 Last but not least, we save the resulting matrix to file
 
 ```{r}
-saveRDS(drug.correlations, "../Data/pert_sigs_6_hour/pert_correlations.RData")
+saveRDS(drug.correlations, "Data/pert_sigs_6_hour/pert_correlations_full.RData")
 ```
 

@@ -14,6 +14,7 @@
 ConstPerturbationLayerFlexible <- function(pert.data) {
     # Correlation for Perturbation
     pert.cor <- cor(pert.data, method = "pearson", use = "pairwise.complete.obs")
+    pert.cor[is.na(pert.cor)] <- 0
     
     saveRDS(pert.cor, "Data/uploading_features/perturbation/perturbation_similarities.RData")
     ## Calculate affinity matrix (from generic distance) as described in SNFtool package with default values

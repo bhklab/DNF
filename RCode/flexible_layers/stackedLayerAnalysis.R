@@ -5,7 +5,7 @@ EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, u
                  sensitivity.file.name="", pert.file.name="", lincs.meta=NULL,
                  atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
                  use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, 
-                 base.dir="") {
+                 base.dir="", pert.new=FALSE, common.drugs=NULL) {
     target.roc.file.name <- CreateTargetROCFileName(base.dir=base.dir, sensitivity.file.name=sensitivity.file.name, 
                                        use.sensitivity=use.sensitivity,
                                        use.perturbation=use.perturbation, use.structure=use.structure,
@@ -45,15 +45,18 @@ EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, u
     }
 
     if (use.perturbation) {
-        # pert.data <- readRDS("Data/pert_sigs_6_hour/pert_correlations.RData")
-        # pert.names <- colnames(pert.data)
         # If using the perturbation layer, use the names from the signature
         # file as the names to be intersected with the sensitivity layer
-        pert.data <- PerturbationDataFlexible(pert.file.name, lincs.meta)  ## 978 X 239
-        print(dim(pert.data)) # 978 x 237 for
-
-        colnames(pert.data) <- toupper(colnames(pert.data))
-        colnames(pert.data) <- gsub(badchars, "", colnames(pert.data))
+        if (pert.new) {
+            pert.data <- PerturbationDataFlexibleCustomSig(pert.file.name)
+        } else {
+            pert.data <- PerturbationDataFlexible(pert.file.name, lincs.meta)  ## 978 X 239
+            print(dim(pert.data)) # 978 x 237 for
+            
+            colnames(pert.data) <- toupper(colnames(pert.data))
+            colnames(pert.data) <- gsub(badchars, "", colnames(pert.data))
+        }
+        
         pert.names <- colnames(pert.data)
 
         # saveRDS(pert.data, "Data/uploading_features/perturbation/pert_features.RData")
@@ -81,10 +84,12 @@ EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, u
     # Find the common drugs between the selected layers
     layers <- list(sens.names = sort(colnames(sens.data)), pert.names=pert.names,
                    luminex.names = sort(colnames(luminex.data)), imaging.names = sort(colnames(imaging.data)))
-    common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
-    # common.drugs <- readRDS("common_drugs.RData")
-    print(length(common.drugs))
+
+    if (is.null(common.drugs)) {
+        common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+    } 
     
+    print(length(common.drugs))
     
     # Subset the datasets for the different layers based on common drugs
     sens.data <- sens.data[common.drugs, common.drugs] # 645 x 239 drugs
@@ -119,8 +124,6 @@ EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, u
     
     if (use.perturbation) {
         pert.aff.mat <- ConstPerturbationLayerFlexible(pert.data)
-        # pert.cor <- pert.data
-        # pert.aff.mat <- SNFtool::affinityMatrix(1-pert.cor, 20, 0.5)
     }
     
     if (use.luminex) {
