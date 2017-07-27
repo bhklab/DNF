@@ -5,7 +5,8 @@ EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, u
                  sensitivity.file.name="", pert.file.name="", lincs.meta=NULL,
                  atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
                  use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, 
-                 base.dir="", pert.new=FALSE, common.drugs=NULL) {
+                 base.dir="", pert.new=FALSE, common.drugs=NULL, compute.drug.target.bench=TRUE,
+                 use.subsetted.pert=FALSE) {
     target.roc.file.name <- CreateTargetROCFileName(base.dir=base.dir, sensitivity.file.name=sensitivity.file.name, 
                                        use.sensitivity=use.sensitivity,
                                        use.perturbation=use.perturbation, use.structure=use.structure,
@@ -50,7 +51,7 @@ EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, u
         if (pert.new) {
             pert.data <- PerturbationDataFlexibleCustomSig(pert.file.name)
         } else {
-            pert.data <- PerturbationDataFlexible(pert.file.name, lincs.meta)  ## 978 X 239
+            pert.data <- PerturbationDataFlexible(pert.file.name, lincs.meta, use.subsetted.pert)  ## 978 X 239
             print(dim(pert.data)) # 978 x 237 for
             
             colnames(pert.data) <- toupper(colnames(pert.data))
@@ -142,12 +143,16 @@ EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, u
     print("Integration done")
     
     # Compute P-Values and create an AUC plot for the drug target benchmark
-    CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name=gmt.file.name,
-                            strc.aff.mat=strc.aff.mat, sens.aff.mat=sens.aff.mat, pert.aff.mat=pert.aff.mat,
-                            integration=integrated, luminex.aff.mat=luminex.aff.mat,
-                            imaging.aff.mat=imaging.aff.mat, target.roc.file.name=target.roc.file.name,
-                            use.ctrpv2=use.ctrpv2, use.clue=use.clue, use.chembl=use.chembl, 
-                            use.dbank=use.dbank, use.dtc=use.dtc)
+    if (compute.drug.target.bench) {
+        CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name=gmt.file.name,
+                                        strc.aff.mat=strc.aff.mat, sens.aff.mat=sens.aff.mat, pert.aff.mat=pert.aff.mat,
+                                        integration=integrated, luminex.aff.mat=luminex.aff.mat,
+                                        imaging.aff.mat=imaging.aff.mat, target.roc.file.name=target.roc.file.name,
+                                        use.ctrpv2=use.ctrpv2, use.clue=use.clue, use.chembl=use.chembl, 
+                                        use.dbank=use.dbank, use.dtc=use.dtc)
+        
+    }
+    
     if (compute.atc) {
         # Compute P-Values and create an AUC plot for the ATC benchmark
         ComputeATCBenchmarkFlexible(atc.benchmark.name=atc.benchmark.name, common.drugs=common.drugs,
@@ -162,4 +167,7 @@ EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, u
         load(gmt.file.name)
         CommunityGenFlexible(integrated, GMT_TARG)
     }
+    
+    res <- list(integrated=integrated)
+    return(res)
 }

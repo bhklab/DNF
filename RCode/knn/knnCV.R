@@ -5,6 +5,7 @@ source("RCode/flexible_layers/knn/drugTargetsKNN.R")
 source("RCode/flexible_layers/compConcordIndxFlexible.R")
 source("RCode/flexible_layers/generateROCPlotFlexible.R")
 source("RCode/predPerf.R")
+source("RCode/knn/knnHelpers.R")
 
 integrated <- readRDS("integrated.RData")
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"

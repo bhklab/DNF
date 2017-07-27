@@ -10,12 +10,17 @@
 ###############################################################################################################
 
 
-PerturbationDataFlexible <- function(pert.file.name, lincs.meta) {
+PerturbationDataFlexible <- function(pert.file.name, lincs.meta, use.subsetted=FALSE) {
+    if (use.subsetted) {
+        df.lincs <- readRDS(pert.file.name)
+        return(df.lincs)
+    }
+    
     
     ## read the perturbation file
     load(pert.file.name)
-    #pert.lincs <- l1000.drug.signatures
-    pert.lincs <- L1000_compounds.perturbation
+    pert.lincs <- L1000_compounds.perturbation        
+
     
     ## extract estimates of the drug pert signatures
     df.lincs <- pert.lincs[,,"estimate"] # 978 genes x 20364 drugs. Actually looks like it's 978 genes x 414 drugs
