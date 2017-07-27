@@ -6,7 +6,7 @@ output:
 ---
 
 ```{r setup}
-knitr::opts_knit$set(root.dir=normalizePath(".."))
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
 ```
 
 
@@ -63,7 +63,7 @@ for (i in names(concatenated.signatures)) {
     for (j in names(concatenated.signatures)) {
         if (j > i) {
             mat.2 <- concatenated.signatures[[j]]
-            temp <- SMI(mat.1, mat.2)
+            temp <- RV(t(mat.1), t(mat.2))
             
             correlation.matrix[i, j] <- temp
             correlation.matrix[j, i] <- temp   

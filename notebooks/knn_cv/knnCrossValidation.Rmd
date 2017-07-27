@@ -1,0 +1,150 @@
+---
+title: "KNN Cross Validation"
+output: html_notebook
+---
+
+## Cross Validation Explanation and Reasoning
+
+Before proceeding, let's recall how this cross validation shall be done. We are doing LOOCV, since k-folds is a bit extreme. By that I mean that leaving out say 10% of the drugs when constructing the network could really change the resulting network, which is not what we want. Furthermore, this is not an accurate use case since a user might upload one or two drugs at most. 
+
+So, let's give the steps for what this algo looks like. For all drugs that we have target data for:
+
+1. Pick a drug X to leave out
+2. Compute the integrated network using all drugs but X. Call this Net.1
+3. Compute the integrated network using all drugs including X. Call this Net.2
+4. Overwrite the values in Net.2 using the values from Net.1 for all drugs except X
+5. Evaluate the top 5 accuracy on X using the modified Net.2 from step 4
+
+## Performance Without Imputation
+
+
+
+### Using ctrpv2 targets
+
+```{r setup}
+knitr::opts_knit$set(root.dir = normalizePath('.../../'))
+getwd()
+```
+
+
+We begin by running the script that computes auc in order to obtain the integrated network.
+
+In order to do so, we first load in all necessary libraries and scripts
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+rm(list=ls())
+
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/luminexDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+source("RCode/flexible_layers/constLuminexLayerFlexible.R")
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+
+source("RCode/flexible_layers/integrateLayersFlexible.R")
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/flexible_layers/stackedLayerAnalysisHelpers.R")
+
+source("RCode/cindexComp2.R")
+source("RCode/predPerf.R")
+
+source("RCode/knn/knnHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+library(PharmacoGx)
+library(apcluster)
+library(rcdk)
+library(fingerprint)
+library(annotate)
+library(org.Hs.eg.db)
+library(SNFtool)
+library(ROCR)
+library(survcomp)
+library(reshape2)
+library(proxy)
+library(PRROC)
+library(apcluster)
+library(profvis)
+
+# Load lincs metadata and clean the pert_inames in it
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+
+pert.file.name <- "Data/L1000_compound_signatures_sub.rds"
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+source("RCode/flexible_layers/stackedLayerAnalysis.R")
+#  Drugs that are common between new signatures and sens data. This is needed to compare apples with apples
+# in terms having benchmarks that include the same drugs in them.
+```
+
+Let's figure out the drugs in common between the 3 standard layers using the old perturbation signatures. By doing so, we can remove a drug one at a time.
+
+```{r}
+sens.data <- readRDS(sensitivity.file.name)
+common.drugs <- intersect(colnames(sens.data), lincs.meta$pert_iname)
+```
+
+We determine the relevant drug targets for the drugs common between the layers. For now, we focus on targets from the  ctrpv2 dataset. 
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, 
+                             gmt.file.name, use.ctrpv2=TRUE,
+                             use.clue=FALSE, use.chembl=FALSE,
+                             use.dbank=FALSE, use.dtc=FALSE) # 141 x 141 drug-drug adjacency matrix --> 141
+data.bench[] <- lapply(data.bench, as.character)
+
+```
+
+Now let's loop over all the drugs in `data.bench` and execute the algo mentioned at the top of this notebook.
+
+```{r}
+g <- profvis({
+    integrated.all <- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
+        use.imaging=FALSE, use.luminex=FALSE, 
+         sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
+        lincs.meta=lincs.meta,
+         atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
+         use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=FALSE, common.drugs=NULL,
+        compute.drug.target.bench=FALSE, use.subsetted.pert = TRUE)
+})
+integrated.all <- integrated.all$integrated
+```
+
+
+```{r}
+accuracies <- numeric(length(unique(data.bench$MOLECULE_NAME)))
+names(accuracies) <- unique(data.bench$MOLECULE_NAME)
+k <- 7
+
+for (drug in unique(data.bench$MOLECULE_NAME)) {
+    common.drugs.one.out <- setdiff(common.drugs, drug)
+    
+    net.1 <- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
+            use.imaging=FALSE, use.luminex=FALSE, 
+             sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
+            lincs.meta=lincs.meta,
+             atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
+             use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=FALSE, common.drugs=common.drugs.one.out,
+            compute.drug.target.bench=FALSE, use.subsetted.pert = TRUE)$integrated
+    
+    net.2 <- integrated.all
+    net.2[rownames(net.1), colnames(net.1)] <- net.1
+    
+    accuracies[drug] <-  GetKNNAccuracy(k, net.2, data.bench)[drug]
+    print(drug)
+}
+```
+
+
+```{r}
+sum(accuracies) / length(accuracies)
+```
+

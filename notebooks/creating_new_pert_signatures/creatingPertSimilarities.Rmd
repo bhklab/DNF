@@ -41,6 +41,7 @@ for (cell.line in names(signatures)) {
 
 So `concatenated.signatures` is a list of vectors where each vector is a bunch of pert sigs concatenated together
 
+Now we create a placeholder matrix that will contain the various signatures. Every column in this matrix represents a signature for a drug. In fact, it is a bunch of signatures, (one per cell line), stacked on top of one another.
 
 ```{r}
 signature.sizes <- lapply(concatenated.signatures, length)
@@ -65,6 +66,8 @@ for (drug in names(concatenated.signatures)) {
 }
 ```
 
+Now we can replace the pert_ids with pert_inames. Doing so reveals that there are actually multiple signatures per drug. By that I'm not referring to the fact that we computed a signature for every cell line but rather that the same drug was tested multiple times across the cell lines. The pert_ids might be unique, but the pert_inames are not. Hence, there is a need to somehow average columns together for drugs that show up multiple times.
+
 ```{r}
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
 lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
@@ -77,9 +80,29 @@ drug.names <- lincs.meta$pert_iname[relevant.indices]
 colnames(placeholder) <- drug.names
 
 placeholder <- placeholder[, order(colnames(placeholder))]
-
-saveRDS(placeholder, "Data/pert_sigs_6_hour/pert_features_full.RData")
 ```
+
+```{r}
+features <- matrix(NA, nrow=nrow(placeholder), ncol=length(unique(colnames(placeholder))))
+rownames(features) <- rownames(placeholder)
+colnames(features) <- sort(unique(colnames(placeholder)))
+
+for (drug in colnames(placeholder)) {
+    temp <- placeholder[, colnames(placeholder) == drug, drop=F]
+    
+    temp <- rowMeans(temp, na.rm=T)
+    features[, drug] <- temp
+}
+
+features[is.nan(features)] <- NA
+```
+
+We can finally save the features to file.
+
+```{r}
+saveRDS(features, "Data/pert_sigs_6_hour/pert_features_full.RData")
+```
+
 
 
 Lastly, we compute the actual correlations

@@ -123,19 +123,31 @@ Now let's create some subsetted versions of the pert data correlation matrices. 
 
 ```{r}
 set.seed(981)
-imputation.sizes <- c(10, 25, 50, 100)
+imputation.sizes <- c(0, 10, 25, 50, 100, length(benchmark.drugs))
 
 subsetted.pert.cor <- list()
+subsetted.sens.cor <- list()
+subsetted.strc.cor <- list()
 
 for (i in imputation.sizes) {
     drugs.to.remove <- sample(1:length(benchmark.drugs), i)
     drugs.to.remove <- benchmark.drugs[drugs.to.remove]
     
-    temp <- pert.data[, common.drugs]
-    temp <- temp[, !(colnames(temp) %in% drugs.to.remove)]
-    subsetted.pert.cor[[as.character(i)]] <- cor(temp, method="pearson", use="pairwise.complete.obs")
+    temp.pert <- pert.data[, common.drugs]
+    temp.pert <- temp.pert[, !(colnames(temp.pert) %in% drugs.to.remove)]
+    subsetted.pert.cor[[as.character(i)]] <- cor(temp.pert, method="pearson", use="pairwise.complete.obs")
     
-    print(dim(subsetted.pert.cor[[as.character(i)]]))
+    temp.sens <- sens.data[common.drugs, common.drugs]
+    temp.sens <- temp.sens[!(rownames(temp.sens) %in% drugs.to.remove), !(colnames(temp.sens) %in% drugs.to.remove)]
+    subsetted.sens.cor[[as.character(i)]] <- temp.sens
+    
+    temp.strc <- strc.data[common.drugs]
+    temp.strc <- temp.strc[!(names(temp.strc) %in% drugs.to.remove)]
+    temp.names <- names(temp.strc)
+    temp.strc <- fingerprint::fp.sim.matrix(temp.strc, method = "tanimoto")
+    colnames(temp.strc) <- temp.names
+    rownames(temp.strc) <- temp.names
+    subsetted.strc.cor[[as.character(i)]] <- temp.strc
 }
 ```
 
@@ -143,15 +155,18 @@ for (i in imputation.sizes) {
 We need to determine the union of all drugs between the various layers. These will then become the row and column names for the various augmented matrices.
 
 ```{r}
-all.drugs <- sort(Reduce(union, list(rownames(strc.cor), rownames(sens.cor))))
+all.drugs <- common.drugs
 ```
 
+#### Perturbation Imputation Effect
 
 Now we loop over the various subsetted perturbation data versions and evaluate the performance of imputing the drugs that are intentionally missing.
 
 ```{r, fig.width=5, fig.height=5}
 for (i in imputation.sizes) {
     pert.cor <- subsetted.pert.cor[[as.character(i)]]
+    sens.cor <- subsetted.sens.cor[["0"]]
+    strc.cor <- subsetted.strc.cor[["0"]]
     
     correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
     
@@ -163,6 +178,75 @@ for (i in imputation.sizes) {
     integrated <- SNFtool::SNF(affinity.matrices)
     rownames(integrated) <- all.drugs
     colnames(integrated) <- all.drugs
+    
+    paste("-----Evaluating Performance on ", i, "imputed drugs-----", sep=" ")
+    
+    CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
+                                    strc.aff.mat=affinity.matrices$strc, 
+                                    sens.aff.mat=affinity.matrices$sens, pert.aff.mat=affinity.matrices$pert,
+                                    integration=integrated, luminex.aff.mat=NULL,
+                                    imaging.aff.mat=NULL, target.roc.file.name="blessed_roc.pdf",
+                                    use.ctrpv2=TRUE, use.clue=FALSE, use.chembl=FALSE, 
+                                    use.dbank=FALSE, use.dtc=FALSE)
+
+}
+```
+
+#### Senstivity Imputation Effect
+
+Now we loop over the various subsetted sensitivity data versions and evaluate the performance of imputing the drugs that are intentionally missing.
+```{r, fig.width=5, fig.height=5}
+for (i in imputation.sizes) {
+    pert.cor <- subsetted.pert.cor[["0"]]
+    sens.cor <- subsetted.sens.cor[[as.character(i)]]
+    strc.cor <- subsetted.strc.cor[["0"]]
+    
+    
+    correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
+    
+    augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, correlation.matrices)
+    affinity.matrices <- CreateAffinityMatrices(augmented.matrices)
+    affinity.matrices <- ReplaceAffinityMatrixValuesFast(affinity.matrices, correlation.matrices, all.drugs)
+    
+    integrated <- SNFtool::SNF(affinity.matrices)
+    rownames(integrated) <- all.drugs
+    colnames(integrated) <- all.drugs
+    
+    paste("-----Evaluating Performance on ", i, "imputed drugs-----", sep=" ")
+    
+    CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
+                                    strc.aff.mat=affinity.matrices$strc, 
+                                    sens.aff.mat=affinity.matrices$sens, pert.aff.mat=affinity.matrices$pert,
+                                    integration=integrated, luminex.aff.mat=NULL,
+                                    imaging.aff.mat=NULL, target.roc.file.name="blessed_roc.pdf",
+                                    use.ctrpv2=TRUE, use.clue=FALSE, use.chembl=FALSE, 
+                                    use.dbank=FALSE, use.dtc=FALSE)
+
+}
+```
+
+#### Structure Imputation Effect
+
+Now we loop over the various subsetted structure data versions and evaluate the performance of imputing the drugs that are intentionally missing.
+```{r, fig.width=5, fig.height=5}
+for (i in imputation.sizes) {
+    pert.cor <- subsetted.pert.cor[["0"]]
+    sens.cor <- subsetted.sens.cor[["0"]]
+    strc.cor <- subsetted.strc.cor[[as.character(i)]]
+    
+    correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
+    
+    augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, correlation.matrices)
+    affinity.matrices <- CreateAffinityMatrices(augmented.matrices)
+    affinity.matrices <- ReplaceAffinityMatrixValuesFast(affinity.matrices, correlation.matrices, all.drugs)
+    
+    integrated <- SNFtool::SNF(affinity.matrices)
+    rownames(integrated) <- all.drugs
+    colnames(integrated) <- all.drugs
+    
+    paste("-----Evaluating Performance on ", i, "imputed drugs-----", sep=" ")
     
     CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
                                     strc.aff.mat=affinity.matrices$strc, 
@@ -191,27 +275,43 @@ We again create subsetted versions of the pert layer, each with progressively le
 
 ```{r}
 set.seed(981)
-imputation.sizes <- c(10, 25, 50, 100)
+imputation.sizes <- c(0, 25, 50, 75, 100, 125, 150, 175, 200,length(benchmark.drugs))
 
 subsetted.pert.cor <- list()
+subsetted.sens.cor <- list()
+subsetted.strc.cor <- list()
 
 for (i in imputation.sizes) {
     drugs.to.remove <- sample(1:length(benchmark.drugs), i)
     drugs.to.remove <- benchmark.drugs[drugs.to.remove]
     
-    temp <- pert.data[, common.drugs]
-    temp <- temp[, !(colnames(temp) %in% drugs.to.remove)]
-    subsetted.pert.cor[[as.character(i)]] <- cor(temp, method="pearson", use="pairwise.complete.obs")
+    temp.pert <- pert.data[, common.drugs]
+    temp.pert <- temp.pert[, !(colnames(temp.pert) %in% drugs.to.remove)]
+    subsetted.pert.cor[[as.character(i)]] <- cor(temp.pert, method="pearson", use="pairwise.complete.obs")
     
-    print(dim(subsetted.pert.cor[[as.character(i)]]))
+    temp.sens <- sens.data[common.drugs, common.drugs]
+    temp.sens <- temp.sens[!(rownames(temp.sens) %in% drugs.to.remove), !(colnames(temp.sens) %in% drugs.to.remove)]
+    subsetted.sens.cor[[as.character(i)]] <- temp.sens
+    
+    temp.strc <- strc.data[common.drugs]
+    temp.strc <- temp.strc[!(names(temp.strc) %in% drugs.to.remove)]
+    temp.names <- names(temp.strc)
+    temp.strc <- fingerprint::fp.sim.matrix(temp.strc, method = "tanimoto")
+    colnames(temp.strc) <- temp.names
+    rownames(temp.strc) <- temp.names
+    subsetted.strc.cor[[as.character(i)]] <- temp.strc
 }
 ```
 
-Finally, we loop over the various subsetted versions of the pert layer and compute performance
+#### Perturbation Imputation Effect
+
+Now we loop over the various subsetted perturbation data versions and evaluate the performance of imputing the drugs that are intentionally missing.
 
 ```{r, fig.width=5, fig.height=5}
 for (i in imputation.sizes) {
     pert.cor <- subsetted.pert.cor[[as.character(i)]]
+    sens.cor <- subsetted.sens.cor[["0"]]
+    strc.cor <- subsetted.strc.cor[["0"]]
     
     correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
     
@@ -223,6 +323,8 @@ for (i in imputation.sizes) {
     integrated <- SNFtool::SNF(affinity.matrices)
     rownames(integrated) <- all.drugs
     colnames(integrated) <- all.drugs
+    
+    paste("-----Evaluating Performance on ", i, "imputed drugs-----", sep=" ")
     
     CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
                                     strc.aff.mat=affinity.matrices$strc, 
@@ -231,57 +333,19 @@ for (i in imputation.sizes) {
                                     imaging.aff.mat=NULL, target.roc.file.name="blessed_roc.pdf",
                                     use.ctrpv2=TRUE, use.clue=TRUE, use.chembl=TRUE, 
                                     use.dbank=FALSE, use.dtc=FALSE)
+
 }
 ```
 
-## Using New Perturbation Signatures
+#### Senstivity Imputation Effect
 
-### Performance on CTRPv2
-
-We begin by loading in the new perturbation signatures
-
-```{r}
-pert.file.name <- "Data/pert_sigs_6_hour/pert_features_full.RData"
-pert.data <- PerturbationDataFlexibleCustomSig(pert.file.name)  ## 978 X 23
-
-layers <- list(sens.names = sort(colnames(sens.data)), pert.names=colnames(pert.data),
-               strc.names = names(strc.data))
-common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
-```
-
-Let's get the drugs that are found in the ctrpv2 drug target dataset
-
-```{r}
-benchmark.drugs <- DrugTargetBenchFlexible(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
-                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
-benchmark.drugs <- colnames(benchmark.drugs)
-```
-
-We again create subsetted versions of the pert layer, each with progressively less drugs in them
-
-```{r}
-set.seed(981)
-imputation.sizes <- c(10, 25, 50, 100)
-
-subsetted.pert.cor <- list()
-
-for (i in imputation.sizes) {
-    drugs.to.remove <- sample(1:length(benchmark.drugs), i)
-    drugs.to.remove <- benchmark.drugs[drugs.to.remove]
-    
-    temp <- pert.data[, common.drugs]
-    temp <- temp[, !(colnames(temp) %in% drugs.to.remove)]
-    subsetted.pert.cor[[as.character(i)]] <- cor(temp, method="pearson", use="pairwise.complete.obs")
-    
-    print(dim(subsetted.pert.cor[[as.character(i)]]))
-}
-```
-
-Now we loop over the subsetted datasets and evaluate performance
-
+Now we loop over the various subsetted sensitivity data versions and evaluate the performance of imputing the drugs that are intentionally missing.
 ```{r, fig.width=5, fig.height=5}
 for (i in imputation.sizes) {
-    pert.cor <- subsetted.pert.cor[[as.character(i)]]
+    pert.cor <- subsetted.pert.cor[["0"]]
+    sens.cor <- subsetted.sens.cor[[as.character(i)]]
+    strc.cor <- subsetted.strc.cor[["0"]]
+    
     
     correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
     
@@ -294,12 +358,48 @@ for (i in imputation.sizes) {
     rownames(integrated) <- all.drugs
     colnames(integrated) <- all.drugs
     
+    paste("-----Evaluating Performance on ", i, "imputed drugs-----", sep=" ")
+    
     CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
                                     strc.aff.mat=affinity.matrices$strc, 
                                     sens.aff.mat=affinity.matrices$sens, pert.aff.mat=affinity.matrices$pert,
                                     integration=integrated, luminex.aff.mat=NULL,
                                     imaging.aff.mat=NULL, target.roc.file.name="blessed_roc.pdf",
-                                    use.ctrpv2=TRUE, use.clue=FALSE, use.chembl=FALSE, 
+                                    use.ctrpv2=TRUE, use.clue=TRUE, use.chembl=TRUE, 
                                     use.dbank=FALSE, use.dtc=FALSE)
+
+}
+```
+
+#### Structure Imputation Effect
+
+Now we loop over the various subsetted structure data versions and evaluate the performance of imputing the drugs that are intentionally missing.
+```{r, fig.width=5, fig.height=5}
+for (i in imputation.sizes) {
+    pert.cor <- subsetted.pert.cor[["0"]]
+    sens.cor <- subsetted.sens.cor[["0"]]
+    strc.cor <- subsetted.strc.cor[[as.character(i)]]
+    
+    correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
+    
+    augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, correlation.matrices)
+    affinity.matrices <- CreateAffinityMatrices(augmented.matrices)
+    affinity.matrices <- ReplaceAffinityMatrixValuesFast(affinity.matrices, correlation.matrices, all.drugs)
+    
+    integrated <- SNFtool::SNF(affinity.matrices)
+    rownames(integrated) <- all.drugs
+    colnames(integrated) <- all.drugs
+    
+    paste("-----Evaluating Performance on ", i, "imputed drugs-----", sep=" ")
+    
+    CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
+                                    strc.aff.mat=affinity.matrices$strc, 
+                                    sens.aff.mat=affinity.matrices$sens, pert.aff.mat=affinity.matrices$pert,
+                                    integration=integrated, luminex.aff.mat=NULL,
+                                    imaging.aff.mat=NULL, target.roc.file.name="blessed_roc.pdf",
+                                    use.ctrpv2=TRUE, use.clue=TRUE, use.chembl=TRUE, 
+                                    use.dbank=FALSE, use.dtc=FALSE)
+
 }
 ```

@@ -9,14 +9,14 @@ In this notebook, we show the performance of the vanilla model with 3 layers (wh
 In order not to lose our sanity with the relative file paths that rmd chooses to employ, let's set the root directory of this project
 
 ```{r setup}
-knitr::opts_knit$set(root.dir = normalizePath('..'))
+knitr::opts_knit$set(root.dir = normalizePath('../../../'))
 getwd()
 ```
 
 
 We start by importing the necessary functions
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 rm(list=ls())
 
 source("RCode/flexible_layers/structureDataFlexible.R")
