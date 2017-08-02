@@ -10,7 +10,7 @@
 ###############################################################################################################
 
 
-DrugTargetsKNN <- function(cdrugs, gmt_file_name="communities_flexible", use.ctrpv2=FALSE,
+DrugTargetsKNN <- function(cdrugs, gmt_file_name="temp", use.ctrpv2=FALSE,
                                     use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
     drug.targets <- GetDrugTargetsFromDatasets(cdrugs=cdrugs, use.ctrpv2=use.ctrpv2, use.clue=use.clue,
                                                use.chembl=use.chembl, use.dbank=use.dbank,

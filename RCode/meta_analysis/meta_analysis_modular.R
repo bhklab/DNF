@@ -45,7 +45,7 @@ Main <- function(datasets, save_dir) {
     ### and columns are cell lines
     aucs.all <- CreateAucsAll(datasets, drugs, cell.lines = cell.lines, badchars = badchars)
     
-    saveRDS(aucs.all, "Data/uploading_features/sensitivity/aucs_all.RData")
+    saveRDS(aucs.all, "Data/upload/features/sensitivity/aucs_all.RData")
     
     ### Calculate pearson correlation and zero out NA's. Note that zero 
     ### could be replaced with a more clever prior in the future.
@@ -94,7 +94,7 @@ Main <- function(datasets, save_dir) {
     VisualizeDatasetDiscrepancies(dataset.pairs = dataset.pairs, unlisted.num.samples = unlisted.num.samples)   
     
     saveRDS(aucs.cor2, save_dir)
-    saveRDS(aucs.cor2, "Data/uploading_features/sensitivity/aucs_cor2.RData")
+    saveRDS(aucs.cor2, "Data/upload/similarities/sensitivity/aucs_cor2.RData")
     
     list(discrepancies=self.discrepancies, dataset.pairs=dataset.pairs)
 }
