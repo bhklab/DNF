@@ -121,7 +121,7 @@ ReplaceDrugNamesManualCurationPertInames <- function(drug.names) {
     pert.inames
 }
 
-CreateFinalCorrelationWithoutDups <- function(aucs.cor, aucs.drugs) {
+CreateFinalCorrelationWithoutDups <- function(aucs.cor, aucs.drugs, aucs.dupl) {
     # Creates what will eventually be the final correlation matrix, except that
     # duplicated drugs have yet to have their correlations combined.
     #
@@ -134,13 +134,22 @@ CreateFinalCorrelationWithoutDups <- function(aucs.cor, aucs.drugs) {
     #   A correlation matrix without duplicated drug names. The correlations for 
     #   duplicated drugs have not yet been combined at this point. Drug names here
     #   are no longer prepended with the dataset.
-    aucs.drugs2 <- sort(unique(aucs.drugs))
     
+    not.duplicated.drugs <- setdiff(aucs.drugs, aucs.dupl)
     ### Create placeholder for final correlation matrix. Copy values from first correlation
     ### matrix for drugs that don't have duplicates
-    aucs.cor2 <- matrix(NA, nrow=length(aucs.drugs2), ncol=length(aucs.drugs2), dimnames=list(aucs.drugs2, aucs.drugs2))
-    iix <- sapply(strsplit(rownames(aucs.cor)[!duplicated(aucs.drugs)], ":::"), function (x) { return (x[[2]])})
-    aucs.cor2[iix, iix] <- aucs.cor[!duplicated(aucs.drugs), !duplicated(aucs.drugs)]
+    aucs.cor2 <- matrix(NA, nrow=length(aucs.drugs), ncol=length(aucs.drugs), dimnames=list(aucs.drugs, aucs.drugs))
+    
+    indices <- c()
+    for (i in not.duplicated.drugs) {
+        temp <- which(endsWith(rownames(aucs.cor), paste(":::", i, sep="")))
+        
+        if (length(temp) == 1) {
+            indices <- c(indices, temp)
+        }
+    }
+    
+    aucs.cor2[not.duplicated.drugs, not.duplicated.drugs] <- aucs.cor[indices, indices]
     
     aucs.cor2
 }

@@ -64,7 +64,9 @@ Main <- function(datasets, save_dir) {
     ### returns a matrix the full size of aucs.cor2. The role the duplicated() function plays is the following:
     ### for drugs that exist in multiple datasets, take the correlation that's in the first dataset.
     aucs.drugs <- sapply(strsplit(rownames(aucs.cor), ":::"), function (x) { return (x[[2]])})
-    aucs.cor2 <- CreateFinalCorrelationWithoutDups(aucs.cor, aucs.drugs)
+    aucs.dupl <- sort(unique(aucs.drugs[duplicated(aucs.drugs)]))
+    aucs.drugs <- sort(unique(aucs.drugs))
+    aucs.cor2 <- CreateFinalCorrelationWithoutDups(aucs.cor, aucs.drugs, aucs.dupl)
     
     ### Compute number of samples used for correlations in aucs.all. This is slightly trickier
     ### due to the fact that use="pairwise.complete.obs" is being used
@@ -77,7 +79,6 @@ Main <- function(datasets, save_dir) {
     standard.errors <- 1 / sqrt(num.samples.used - 3)
     dimnames(standard.errors) <- dimnames(num.samples.used)
     
-    aucs.dupl <- aucs.drugs[duplicated(aucs.drugs)]
     ### Iterate over drugs that are found across multiple datasets, combine the corresponding
     ### Fisher-Z transformed correlations with survcomp::combine.est, and convert the combined value
     ### back into a correlation by using the inverse Fisher-Z transformation
