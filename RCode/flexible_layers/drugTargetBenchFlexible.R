@@ -51,7 +51,7 @@ DrugTargetBenchFlexible <- function(cdrugs, gmt_file_name="communities_flexible"
 
 GetDrugTargetsFromDatasets <- function(cdrugs, use.ctrpv2=FALSE,
                                 use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
-    drug.targets = data.frame(MOLECULE_NAME=character(0), TARGET_NAME=character(0))
+    drug.targets = data.frame(MOLECULE_NAME=character(0), TARGET_NAME=character(0), stringsAsFactors = F)
     
     if (use.ctrpv2) {
         # DRUG TARGETS BENCHMARKING FROM CTRPV2
@@ -66,7 +66,8 @@ GetDrugTargetsFromDatasets <- function(cdrugs, use.ctrpv2=FALSE,
         drug.targets <- strsplit(ctrp.drug.targs$TARGET_NAME, split = ";")
         ## assign a unique target corresponding to each drug (a target can have multiple assigned drugs and
         ## a drug can be found in different target categories)
-        drug.targets <- data.frame(MOLECULE_NAME = rep(ctrp.drug.targs$MOLECULE_NAME, sapply(drug.targets, length)), TARGET_NAME = unlist(drug.targets))
+        drug.targets <- data.frame(MOLECULE_NAME = rep(ctrp.drug.targs$MOLECULE_NAME, sapply(drug.targets, length)), TARGET_NAME = unlist(drug.targets),
+                                   stringsAsFactors=F)
         ## single target categorty 
         drug.targets <- drug.targets[,c("MOLECULE_NAME","TARGET_NAME")]
     }
@@ -112,7 +113,8 @@ GetDrugTargetsFromDatasets <- function(cdrugs, use.ctrpv2=FALSE,
         
         clue.targets <- strsplit(clue.io.targets$TARGET_NAME, split="|", fixed=TRUE)
         clue.targets <- data.frame(MOLECULE_NAME = rep(clue.io.targets$MOLECULE_NAME,
-                                                       sapply(clue.targets, length)), TARGET_NAME = unlist(clue.targets))
+                                                       sapply(clue.targets, length)), TARGET_NAME = unlist(clue.targets),
+                                   stringsAsFactors = FALSE)
         drug.targets <- rbind.data.frame(drug.targets, clue.targets, stringsAsFactors = FALSE)
         ###
         #####    

@@ -60,7 +60,7 @@ EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, u
         
         pert.names <- colnames(pert.data)
 
-        # saveRDS(pert.data, "Data/uploading_features/perturbation/pert_features.RData")
+        saveRDS(pert.data, "Data/upload/features/perturbation/pert_features.RData")
         
     } else if (use.structure) {
         # If using the structure layer, use the pert_iname column from the LINCS
@@ -114,7 +114,7 @@ EvaluateModelROC <- function(use.sensitivity, use.perturbation, use.structure, u
         strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
         length(strc.data)     
         
-        # saveRDS(strc.data, "Data/uploading_features/structure/structure_features.RData")
+        saveRDS(strc.data, "Data/upload/features/structure/structure_features.RData")
         
         strc.aff.mat <- ConstStructureLayerFlexible(strc.data)
     }

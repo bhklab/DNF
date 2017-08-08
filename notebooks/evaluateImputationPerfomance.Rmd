@@ -47,6 +47,8 @@ source("RCode/flexible_layers/generateROCPlotFlexible.R")
 source("RCode/predPerf.R")
 source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
 
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
 
 
@@ -170,10 +172,12 @@ for (i in imputation.sizes) {
     
     correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
     
+    affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
     augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
-    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, correlation.matrices)
-    affinity.matrices <- CreateAffinityMatrices(augmented.matrices)
-    affinity.matrices <- ReplaceAffinityMatrixValuesFast(affinity.matrices, correlation.matrices, all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, affinity.matrices)
+    affinity.matrices <- ReplaceAffinityMatrixValuesFast(augmented.matrices, correlation.matrices, 
+                                                         all.drugs)
+    affinity.matrices <- medianSimilarity(affinity.matrices)
     
     integrated <- SNFtool::SNF(affinity.matrices)
     rownames(integrated) <- all.drugs
@@ -203,11 +207,14 @@ for (i in imputation.sizes) {
     
     
     correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
-    
+
+    affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
     augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
-    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, correlation.matrices)
-    affinity.matrices <- CreateAffinityMatrices(augmented.matrices)
-    affinity.matrices <- ReplaceAffinityMatrixValuesFast(affinity.matrices, correlation.matrices, all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, affinity.matrices)
+    affinity.matrices <- ReplaceAffinityMatrixValuesFast(augmented.matrices, correlation.matrices, 
+                                                         all.drugs)
+    affinity.matrices <- medianSimilarity(affinity.matrices)
+    
     
     integrated <- SNFtool::SNF(affinity.matrices)
     rownames(integrated) <- all.drugs
@@ -237,10 +244,12 @@ for (i in imputation.sizes) {
     
     correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
     
+    affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
     augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
-    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, correlation.matrices)
-    affinity.matrices <- CreateAffinityMatrices(augmented.matrices)
-    affinity.matrices <- ReplaceAffinityMatrixValuesFast(affinity.matrices, correlation.matrices, all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, affinity.matrices)
+    affinity.matrices <- ReplaceAffinityMatrixValuesFast(augmented.matrices, correlation.matrices, 
+                                                         all.drugs)
+    affinity.matrices <- medianSimilarity(affinity.matrices)
     
     integrated <- SNFtool::SNF(affinity.matrices)
     rownames(integrated) <- all.drugs
@@ -315,10 +324,12 @@ for (i in imputation.sizes) {
     
     correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
     
+    affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
     augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
-    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, correlation.matrices)
-    affinity.matrices <- CreateAffinityMatrices(augmented.matrices)
-    affinity.matrices <- ReplaceAffinityMatrixValuesFast(affinity.matrices, correlation.matrices, all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, affinity.matrices)
+    affinity.matrices <- ReplaceAffinityMatrixValuesFast(augmented.matrices, correlation.matrices, 
+                                                         all.drugs)
+    affinity.matrices <- medianSimilarity(affinity.matrices)
     
     integrated <- SNFtool::SNF(affinity.matrices)
     rownames(integrated) <- all.drugs
@@ -349,10 +360,12 @@ for (i in imputation.sizes) {
     
     correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
     
+    affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
     augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
-    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, correlation.matrices)
-    affinity.matrices <- CreateAffinityMatrices(augmented.matrices)
-    affinity.matrices <- ReplaceAffinityMatrixValuesFast(affinity.matrices, correlation.matrices, all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, affinity.matrices)
+    affinity.matrices <- ReplaceAffinityMatrixValuesFast(augmented.matrices, correlation.matrices, 
+                                                         all.drugs)
+    affinity.matrices <- medianSimilarity(affinity.matrices)
     
     integrated <- SNFtool::SNF(affinity.matrices)
     rownames(integrated) <- all.drugs
@@ -382,10 +395,12 @@ for (i in imputation.sizes) {
     
     correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
     
+    affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
     augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
-    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, correlation.matrices)
-    affinity.matrices <- CreateAffinityMatrices(augmented.matrices)
-    affinity.matrices <- ReplaceAffinityMatrixValuesFast(affinity.matrices, correlation.matrices, all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, affinity.matrices)
+    affinity.matrices <- ReplaceAffinityMatrixValuesFast(augmented.matrices, correlation.matrices, 
+                                                         all.drugs)
+    affinity.matrices <- medianSimilarity(affinity.matrices)
     
     integrated <- SNFtool::SNF(affinity.matrices)
     rownames(integrated) <- all.drugs

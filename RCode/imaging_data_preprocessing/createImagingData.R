@@ -4,9 +4,6 @@
 rm(list=ls())
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
 lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
-lincs.names <- lincs.meta$pert_iname
-lincs.names <- toupper(lincs.names)
-lincs.names <- gsub(badchars, "", lincs.names)
 
 imaging.meta <- read.delim("Data/Broad.HG005032.ProfilingData/imaging/cdrp.imaging.meta.cpd.txt", stringsAsFactors = FALSE)
 imaging <- read.delim("Data/Broad.HG005032.ProfilingData/imaging/cdrp.imaging.profiles.txt", stringsAsFactors = FALSE)
