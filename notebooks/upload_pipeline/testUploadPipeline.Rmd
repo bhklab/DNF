@@ -1,0 +1,87 @@
+---
+title: "Test Upload Pipeline"
+output: html_notebook
+---
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+## Load necessary libraries and source files
+
+```{r, echo=FALSE}
+rm(list=ls())
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/knn/drugTargetsKNN.R")
+source("RCode/uploading_data/pipeline.R")
+source("RCode/uploading_data/uploadHelpers.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+
+library(SNFtool)
+
+feature.file.paths <- list(sensitivity="Data/upload/features/sensitivity/aucs_all.RData", 
+                               perturbation="Data/upload/features/perturbation/pert_features.RData",
+                               structure="Data/upload/features/structure/structure_features.RData",
+                               imaging=NULL)
+    
+similarity.file.paths <- list(sensitivity="Data/upload/similarities/sensitivity/aucs_cor2.RData", 
+                                perturbation="Data/upload/similarities/perturbation/perturbation_similarities.RData",
+                                  structure="Data/upload/similarities/structure/structure_similarities.RData",
+                                  imaging=NULL)
+```
+
+## Create Fake Features For Sensitivity Layer
+
+```{r}
+sens.features <- readRDS(feature.file.paths$sensitivity)
+sens.feature.names <- rownames(sens.features)
+
+new.compound.name <- "fake_drug"
+new.sensitivity.features <- rnorm(length(sens.feature.names) / 2)
+names(new.sensitivity.features) <- sens.feature.names[sample(1:length(sens.feature.names), length(sens.feature.names) / 2)]
+
+new.compound.features <- list(sensitivity=new.sensitivity.features)
+
+res <- UploadNewCompound(feature.file.paths, similarity.file.paths, new.compound.features,
+                         new.compound.name)
+```
+
+## Create Fake Features For Perturbation Layer
+
+```{r}
+pert.features <- readRDS(feature.file.paths$perturbation)
+pert.feature.names <- rownames(pert.features)
+
+new.compound.name <- "fake_drug"
+new.perturbation.features <- rnorm(length(pert.feature.names) / 2)
+names(new.perturbation.features) <- pert.feature.names[sample(1:length(pert.feature.names),
+                                                              length(pert.feature.names) / 2)]
+
+new.compound.features <- list(perturbation=new.perturbation.features)
+
+res <- UploadNewCompound(feature.file.paths, similarity.file.paths, new.compound.features,
+                         new.compound.name)
+```
+
+## Create New SMILES For Structure Layer
+
+```{r}
+new.compound.name <- "fake_drug"
+new.compound.smiles <- "CC(=O)OC1=CC=CC=C1C(O)=O"
+
+new.compound.features <- list(structure=new.compound.smiles)
+
+res <- UploadNewCompound(feature.file.paths, similarity.file.paths, new.compound.features,
+                         new.compound.name)
+```
+
+
+
+
+
+
+
+
+

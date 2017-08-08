@@ -34,45 +34,26 @@ function(x) {
       return(x)
   }
 })
+  
 
-# correlation.matrix <- matrix(0, nrow=length(concatenated.signatures), ncol=length(concatenated.signatures))
-# 
-# rownames(correlation.matrix) <- names(concatenated.signatures)
-# colnames(correlation.matrix) <- names(concatenated.signatures)
-
-# for (i in names(concatenated.signatures)) {
-#     mat.1 <- concatenated.signatures[[i]]
-#     
-#     for (j in names(concatenated.signatures)) {
-#         if (j > i) {
-#             mat.2 <- concatenated.signatures[[j]]
-#             temp <- RV(t(mat.1), t(mat.2))
-#             
-#             correlation.matrix[i, j] <- temp
-#             correlation.matrix[j, i] <- temp   
-#         }
-#     }
-#     print(i)
-# }
-
-correlation.matrix <- foreach(i=names(concatenated.signatures), .combine="rbind") %dopar% 
-{
-    require(foreach)
-    require(MatrixCorrelation)
-    mat.1 <- concatenated.signatures[[i]]
-    
-    foreach (j=names(concatenated.signatures), .combine="c") %do% {
-        mat.2 <- concatenated.signatures[[j]]
+progress <- function(n) cat(sprintf("task %d is complete\n", n))
+opts <- list(progress=progress)
+  
+correlation.matrix <- foreach(i=1:length(concatenated.signatures), 
+                              .packages=c("MatrixCorrelation", "foreach")) %dopar% { 
+    foreach (j=i:length(concatenated.signatures), .combine="c", .packages=c("MatrixCorrelation", "foreach")) %do% {
+        require(foreach)
+        d1 <- names(concatenated.signatures)[i]
+        d2 <- names(concatenated.signatures)[j]
+        
+        mat.1 <- concatenated.signatures[[d1]]
+        mat.2 <- concatenated.signatures[[d2]]
         temp <- RV(t(mat.1), t(mat.2))
-        names(temp) <- j
+        names(temp) <- d2
         temp
     }
-    
-    print(i)
 }
 
-rownames(correlation.matrix) <- names(concatenated.signatures)
-
-# diag(correlation.matrix) <- 1
+names(correlation.matrix) <- names(concatenated.signatures)
 
 saveRDS(correlation.matrix, "pert_matrix_correlations.rds")

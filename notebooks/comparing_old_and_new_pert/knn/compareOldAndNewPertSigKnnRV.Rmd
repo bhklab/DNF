@@ -1,0 +1,205 @@
+---
+title: "Compare Old vs New Perturbation Signatures On KNN Performance - RV"
+output: html_notebook
+---
+
+## Description
+
+The purpose of this notebook is to see the if there is a gain in accuracy when using the new pert singatures that were correlated using the RV coefficient as opposed to the old pert signatures.
+
+Just like when evaluating performance of imputation on the AUC benchmarks, we impute progressively more drugs to see the effect.
+
+## Effect Measured on CTRPv2 Drug Target Dataset
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../../"))
+```
+
+### Load Libraries and Helper Functions
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+set.seed(9833)
+
+library(doParallel)
+library(missForest)
+library(ROCR)
+library(reshape2)
+library(caret)
+library(SNFtool)
+library(org.Hs.eg.db)
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/knn/knnHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+### Load Data For Layers
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Now to load in the sensitivity correlations and the pert signatures
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+pert.data.old <- PerturbationDataFlexible("Data/L1000_compound_signatures.RData", lincs.meta)  ## 978 X 23
+pert.data.new <- PerturbationDataFlexibleCustomSig("Data/pert_sigs_6_hour/pert_rv_correlations.rds")
+
+```
+
+Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+### Find Common Drugs
+
+```{r}
+layers <- list(sens.names = sort(colnames(sens.data)), pert.names=colnames(pert.data.new),
+               strc.names = names(strc.data))
+common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+print(length(common.drugs))
+```
+
+### Create Similarity Matrices
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+So the senstivity data is already a correlation matrix, therefore there is nothing to do there. We just need to compute the similarities for the pert layer on both the old and new signatures, as well as the structure layer.
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+
+pert.cor.old <- cor(pert.data.old[, common.drugs], method="pearson", use="pairwise.complete.obs")
+pert.cor.new <- pert.data.new[common.drugs, common.drugs]
+
+registerDoParallel(4)
+# Impute missing data
+# pert.cor.new <- missForest(pert.cor.new, maxiter=10, parallelize = "variables")$ximp
+
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
+rownames(strc.cor) <- names(strc.data[common.drugs])
+colnames(strc.cor) <- names(strc.data[common.drugs])
+```
+
+
+### Evaluate Performance Old Sigs
+
+```{r}
+k <- 7
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.old, strc=strc.cor)
+    
+affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
+
+integrated <- SNFtool::SNF(affinity.matrices)
+rownames(integrated) <- common.drugs
+colnames(integrated) <- common.drugs
+
+accuracy <- GetKNNAccuracy(k, integrated, data.bench)
+
+print(paste("Accuracy Using Old Sigs:", sum(accuracy) / length(accuracy), sep=" "))
+```
+
+### Evaluate Performance New Sigs
+
+```{r}
+k <- 7
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+    
+affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
+
+integrated <- SNFtool::SNF(affinity.matrices)
+rownames(integrated) <- common.drugs
+colnames(integrated) <- common.drugs
+
+accuracy <- GetKNNAccuracy(k, integrated, data.bench)
+
+print(paste("Accuracy Using New Sigs:", sum(accuracy) / length(accuracy), sep=" "))
+```
+
+## Effect Measured on CTRPv2, CLUE, and CHEMBL
+
+We really just need to obtain the drug targets for the combination of the 3 different datasets, then evaluate performance using that target info
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=TRUE, use.chembl=TRUE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+### Evaluate Performance Old Sigs
+
+```{r}
+k <- 7
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.old, strc=strc.cor)
+    
+affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
+
+integrated <- SNFtool::SNF(affinity.matrices)
+rownames(integrated) <- common.drugs
+colnames(integrated) <- common.drugs
+
+accuracy <- GetKNNAccuracy(k, integrated, data.bench)
+
+print(paste("Accuracy Using Old Sigs:", sum(accuracy) / length(accuracy), sep=" "))
+```
+
+### Evaluate Performance New Sigs
+
+```{r}
+k <- 7
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+    
+affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
+
+integrated <- SNFtool::SNF(affinity.matrices)
+rownames(integrated) <- common.drugs
+colnames(integrated) <- common.drugs
+
+accuracy <- GetKNNAccuracy(k, integrated, data.bench)
+
+print(paste("Accuracy Using New Sigs:", sum(accuracy) / length(accuracy), sep=" "))
+```

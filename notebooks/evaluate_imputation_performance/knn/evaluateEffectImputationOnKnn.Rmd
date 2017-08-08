@@ -1,0 +1,293 @@
+---
+title: "KNN Imputation Effect"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+## Description
+
+The purpose of this notebook is to see the effect of imputing pert and sens values in terms of how that changes the predictions and accuracy of the KNN target prediction method. We will be using the OLD pert sigs
+
+Just like when evaluating performance of imputation on the AUC benchmarks, we impute progressively more drugs to see the effect.
+
+## Effect Measured on CTRPv2 Drug Target Dataset
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../../"))
+```
+
+### Load Libraries and Helper Functions
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+set.seed(9833)
+
+library(ggplot2)
+library(ROCR)
+library(reshape2)
+library(caret)
+library(SNFtool)
+library(org.Hs.eg.db)
+library(doParallel)
+library(foreach)
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/knn/knnHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+
+
+```
+
+
+### Load Data For Layers
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Now to load in the sensitivity correlations and the pert signatures
+
+```{r}
+pert.file.name <- "Data/L1000_compound_signatures.RData"
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+pert.data <- PerturbationDataFlexible(pert.file.name, lincs.meta)  ## 978 X 23
+```
+
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+### Find Common Drugs
+
+Since in this case we are doing what I refer to as artificial imputation, i.e. imputing layers for which we already have values for, we need to subset these layers to the drugs that are common between all of them. It's not like when we're trying to increase the overlap between sens and pert to go from 365 drugs to 600 + drugs. Here we stick to those 365 drugs and remove more and more of them from the pert or sens layers.
+
+```{r}
+layers <- list(sens.names = sort(colnames(sens.data)), pert.names=colnames(pert.data),
+               strc.names = names(strc.data))
+common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+common.drugs <- sort(common.drugs)
+print(length(common.drugs))
+```
+
+### Create Similarity Matrices
+
+Since we want to be able to see the peformance of imputation on arbitrary layers, we need to determine the drugs that are relevant to AUC, i.e. the drugs that are in the benchmark
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+The sensitivity layer data is already in correlation matrix form, so there is nothing to be done
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+```
+
+For the perturbation and structure layers, we need to actually compute some correlations since `pert.data` and `strc.data` contain features, not similarities.
+
+```{r}
+pert.cor <- cor(pert.data[, common.drugs], method="pearson", use="pairwise.complete.obs")
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method="tanimoto")
+rownames(strc.cor) <- common.drugs
+colnames(strc.cor) <- common.drugs
+```
+
+Now, we create subsetted versions of the sensitivity, perturbation, and structure similarity matrices. The missing drugs will later on be imputed using affinities from other layers.
+
+```{r}
+imputation.sizes <- c(10, 25, 50, 100)
+drugs.to.remove <- list()
+
+num.iterations <- 100
+
+for (i in imputation.sizes) {
+    drugs.to.remove[[as.character(i)]] <- list()
+    
+    for (j in 1:num.iterations) {
+        temp <- sample(1:length(benchmark.drugs), i)
+        drugs.to.remove[[as.character(i)]][[j]] <- benchmark.drugs[temp]
+    }
+}
+
+drugs.to.remove[["0"]] <- list()
+drugs.to.remove[["0"]][[1]] <- character(0)
+
+drugs.to.remove[[as.character(length(benchmark.drugs))]] <- list()
+drugs.to.remove[[as.character(length(benchmark.drugs))]][[1]] <- benchmark.drugs
+```
+
+At this point, we need to determine the union of all drugs across layers. Since we subsetted to common drugs already, this will be the same as common drugs, however this is not true in general.
+
+```{r}
+all.drugs <- common.drugs
+```
+
+```{r, include=FALSE}
+PlotAccuracies <- function(plot.data) {
+    p <- ggplot(accuracy.stats, aes(x=n))
+    p <- p + geom_line(data=plot.data, aes(x=n, y=sens.mean), color="green4")
+    p <- p + geom_line(data=plot.data, aes(x=n, y=strc.mean), color="blue")
+    p <- p + geom_line(data=plot.data, aes(x=n, y=pert.mean), color="orange")
+    
+    p <- p + geom_ribbon(aes(ymin=sens.mean - sens.std, ymax=sens.mean + sens.std), alpha=0.3, fill="green")
+    p <- p + geom_ribbon(aes(ymin=strc.mean - strc.std, ymax=strc.mean + strc.std), alpha=0.3, fill="blue")
+    p <- p + geom_ribbon(aes(ymin=pert.mean - pert.std, ymax=pert.mean + pert.std), alpha=0.3, fill="orange")
+    
+    p <- p + scale_x_continuous(labels=c(0, 10, 25, 50, 100, 141),
+                                breaks=c(0, 10, 25, 50, 100, 141))
+    p <- p + ggtitle("Effect Of Imputation on KNN Accuracy")
+    p <- p + xlab("# Drugs Imputed")
+    p <- p + ylab("Accuracy")
+    p
+}
+```
+
+
+### See Effect On Sensitivity
+
+What happens if we impute the senstivity layer using affinities from the other two layers?
+
+```{r, echo=FALSE}
+accuracies.sens.ctrpv2 <- GetImputedAccuracies('sens', drugs.to.remove, pert.cor,
+                                               sens.cor, strc.cor)
+```
+
+### See Effect On Structure
+
+What happens if we impute the structure layer using affinities from the other two layers?
+
+```{r, echo=FALSE}
+accuracies.strc.ctrpv2 <- GetImputedAccuracies('strc', drugs.to.remove, pert.cor,
+                                               sens.cor, strc.cor)
+```
+
+### See Effect On Perturbation
+
+What happens if we impute the perturbation layer using affinities from the other two layers?
+
+```{r, echo=FALSE}
+accuracies.pert.ctrpv2 <- GetImputedAccuracies('pert', drugs.to.remove, pert.cor,
+                                               sens.cor, strc.cor)
+```
+
+We create the data frame containing the means and standard deviations that will be plotted
+
+```{r}
+plot.data <- CreateDataForGGPlot(accuracies.pert.ctrpv2, accuracies.sens.ctrpv2, 
+                                 accuracies.strc.ctrpv2)
+```
+
+We now plot the data 
+
+```{r}
+PlotAccuracies(plot.data)
+```
+
+## Effect Measured on Combination of CTRPv2, Chembl, and Clue
+
+All we need to do is update the benchmark drugs to reflect the combination of these drug target datasets, and then recreate the subsetted similarity matrices.
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=TRUE, use.chembl=TRUE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+```{r}
+set.seed(555)
+
+imputation.sizes <- c(10, 25, 50, 100, 125, 150, 175, 200)
+drugs.to.remove <- list()
+
+num.iterations <- 100
+
+for (i in imputation.sizes) {
+    drugs.to.remove[[as.character(i)]] <- list()
+    
+    for (j in 1:num.iterations) {
+        temp <- sample(1:length(benchmark.drugs), i)
+        drugs.to.remove[[as.character(i)]][[j]] <- benchmark.drugs[temp]
+    }
+}
+
+drugs.to.remove[["0"]] <- list()
+drugs.to.remove[["0"]][[1]] <- character(0)
+
+drugs.to.remove[[as.character(length(benchmark.drugs))]] <- list()
+drugs.to.remove[[as.character(length(benchmark.drugs))]][[1]] <- benchmark.drugs
+```
+
+### See Effect On Sensitivity
+
+What happens if we impute the senstivity layer using affinities from the other two layers?
+
+```{r, echo=FALSE}
+accuracies.sens.combined <- GetAccuracies('sens')
+```
+
+### See Effect On Structure
+
+What happens if we impute the structure layer using affinities from the other two layers?
+
+```{r, echo=FALSE}
+accuracies.strc.combined <- GetAccuracies('strc')
+```
+
+### See Effect On Perturbation
+
+What happens if we impute the perturbation layer using affinities from the other two layers?
+
+```{r, echo=FALSE}
+accuracies.pert.combined <- GetAccuracies('pert')
+```
+
+```{r}
+plot.data <- CreateDataForGGPlot(accuracies.pert.combined, accuracies.sens.combined, accuracies.strc.combined)
+```
+
+We now plot the data 
+
+```{r}
+CreatePlot(plot.data)
+```

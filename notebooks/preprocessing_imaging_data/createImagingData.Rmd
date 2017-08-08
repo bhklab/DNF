@@ -1,0 +1,110 @@
+---
+title: "Create Imaging Data"
+output: html_notebook
+---
+
+This notebook contains chunks that create the data for the imaging layer given the raw features and metadata. It attempts several different normalization methods for the sake of later on showing that normalization doesn't have much of an effect
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+## Load Data
+
+We begin by loading in the L1000 metadata which will help us assign drug names to the drugs from the imaging dataset.
+
+```{r, echo=FALSE}
+rm(list=ls())
+library(ggplot2)
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+```
+
+Next, we load in the imaging data and imaging metadata
+
+```{r, echo=FALSE}
+imaging.meta <- read.delim("Data/Broad.HG005032.ProfilingData/imaging/cdrp.imaging.meta.cpd.txt", stringsAsFactors = FALSE)
+imaging <- read.delim("Data/Broad.HG005032.ProfilingData/imaging/cdrp.imaging.profiles.txt", stringsAsFactors = FALSE)
+```
+
+## Clean Drug Names
+
+Now we can clean up the names found in the L1000 metadata as well as the cell painting metadata
+
+```{r, echo=FALSE}
+# Clean names and IDs
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+lincs.meta$pert_id <- toupper(lincs.meta$pert_id)
+lincs.meta$pert_id <- gsub(badchars, "", lincs.meta$pert_id)
+imaging.meta$name <- toupper(imaging.meta$name)
+imaging.meta$name <- gsub(badchars, "", imaging.meta$name)
+```
+
+Get rid of the control compound from the imaging data. Replace the imaging BROAD IDs with the corresponding drug names, and get rid of dupes by just taking the first occurrance of every drug
+
+```{r}
+imaging <- imaging[imaging$BROAD_ID != "DMSO", ]
+
+for (brd in unique(imaging$BROAD_ID)) {
+    drug.name <- imaging.meta[match(brd, imaging.meta$BROAD_ID), 'name']
+    
+    if (!is.na(drug.name)) {
+        imaging$BROAD_ID[imaging$BROAD_ID %in% brd] <- drug.name    
+    }
+}
+
+imaging <- imaging[!duplicated(imaging$BROAD_ID), ]
+rownames(imaging) <- imaging$BROAD_ID
+imaging <- imaging[, -1]
+```
+
+## Data Investigation
+
+Let's see how a random sample of 20 features are distributed by creating a density plot for each one
+
+```{r}
+cols <- sample(1:ncol(imaging), 20)
+
+p <- ggplot(data=imaging) + stat_density(aes_string(x=colnames(imaging)[cols[1]]))
+
+for (i in 2:length(cols)) {
+    p <- p + stat_density(aes_string(x=colnames(imaging)[cols[i]]), color=i)
+}
+
+p
+```
+
+## Scaling Data
+
+```{r}
+imaging.scaled <- scale(imaging)
+imaging.scaled <- as.data.frame(imaging.scaled)
+
+cols <- sample(1:ncol(imaging.scaled), 20)
+
+p <- ggplot(data=imaging.scaled) + stat_density(aes_string(x=colnames(imaging.scaled)[cols[1]]))
+
+for (i in 2:length(cols)) {
+    p <- p + stat_density(aes_string(x=colnames(imaging.scaled)[cols[i]]), color=i)
+}
+
+p
+```
+
+## Saving Data 
+
+Now that we have both the scaled and unscaled versions of the data, let's save them to file. First, we transpose so that drugs are columns and features are rows.
+
+```{r}
+imaging <- as.matrix(imaging)
+imaging <- t(imaging)
+
+imaging.scaled <- as.matrix(imaging.scaled)
+imaging.scaled <- t(imaging.scaled)
+
+saveRDS(imaging, "Data/imaging_processed/imaging_full_no_normalization.rds")
+saveRDS(imaging.scaled, "Data/imaging_processed/imaging_full_scaled.rds")
+```
+

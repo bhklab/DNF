@@ -1,0 +1,57 @@
+---
+title: "Verify AUC Correctness"
+output: html_notebook
+---
+
+```{r setup}
+knitr::opts_knit$set(root.dir = normalizePath("../../"))
+```
+
+
+```{r}
+source("RCode/custom_c_index_computation/computeCIndex.R")
+library(ROCR)
+```
+
+We first look at a linearly seperable case
+
+```{r}
+x <- c(0.1, 0.3, 0.6, 0.8, 0.9)
+y <- c(0, 0, 1, 1, 1)
+
+custom.c.index <- ComputeCIndex(x, y)
+pred <- prediction(x, as.factor(y))
+pert <- performance(pred, 'tpr', 'fpr')
+```
+
+
+Now we see performance on random data
+
+```{r}
+x <- rnorm(100, 0.55, 0.05)
+y <- x + rnorm(100, -0.1, 0.05)
+y <- round(y)
+
+custom.c.index <- ComputeCIndex(x, y)
+pred <- prediction(x, as.factor(y))
+pert <- performance(pred, 'tpr', 'fpr')
+auc <-  performance(pred, 'auc')
+```
+
+Lastly, let's look at random linearly separable data
+
+```{r}
+x <- rnorm(100, 0.55, 0.05)
+y <- round(x)
+
+custom.c.index <- ComputeCIndex(x, y)
+pred <- prediction(x, as.factor(y))
+pert <- performance(pred, 'tpr', 'fpr')
+auc <-  performance(pred, 'auc')
+```
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).

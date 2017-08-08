@@ -1,0 +1,198 @@
+---
+title: "Compare Old And New Pert Signatures AUC - RV"
+output:
+  html_document: default
+  html_notebook: default
+---
+In this notebook, we show the performance of the vanilla model with 3 layers (where sensitivity datsets have been combined into a single matrix to increase overlap). This is essentially the new benchmark to beat in terms of auc.
+
+In order not to lose our sanity with the relative file paths that rmd chooses to employ, let's set the root directory of this project
+
+```{r setup}
+knitr::opts_knit$set(root.dir = normalizePath('../../../'))
+```
+
+
+We start by importing the necessary functions
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/luminexDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+source("RCode/flexible_layers/constLuminexLayerFlexible.R")
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+
+source("RCode/flexible_layers/integrateLayersFlexible.R")
+source("RCode/flexible_layers/generateDrugPairsFlexible.R")
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/flexible_layers/compConcordIndxFlexible.R")
+source("RCode/flexible_layers/printCIndices.R")
+source("RCode/flexible_layers/printPVals.R")
+source("RCode/flexible_layers/generateROCPlotFlexible.R")
+source("RCode/flexible_layers/atcBenchFlexible.R")
+source("RCode/flexible_layers/compDrugTargetBenchmarkFlexible.R")
+source("RCode/flexible_layers/computeATCBenchmarkFlexible.R")
+source("RCode/flexible_layers/stackedLayerAnalysisHelpers.R")
+source("RCode/flexible_layers/communityGenFlexible.R")
+
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/cindexComp2.R")
+source("RCode/predPerf.R")
+
+library(PharmacoGx)
+library(apcluster)
+library(rcdk)
+library(fingerprint)
+library(annotate)
+library(org.Hs.eg.db)
+library(SNFtool)
+library(ROCR)
+library(survcomp)
+library(reshape2)
+library(proxy)
+library(PRROC)
+library(apcluster)
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+
+pert.file.name.old <- "Data/L1000_compound_signatures.RData"
+pert.file.name.new <- "Data/pert_sigs_6_hour/pert_rv_correlations.rds"
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+source("RCode/flexible_layers/stackedLayerAnalysis.R")
+```
+
+## Load In Data
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Load in the senstivity and perturbation data. We load in the new perturbation data at this point too since we will need it to subset to common drugs. The issue is that the new perturbation signatures are missing 8 drugs vs the old signatures since they were computed using only 9 cell lines. Thus, we need the drug names from the new signatures to subset the old signatures so that we compare apples with apples.
+
+```{r}
+sens.data <- readRDS(sensitivity.file.name)
+pert.data.old <- PerturbationDataFlexible(pert.file.name.old, lincs.meta)
+pert.data.new <- PerturbationDataFlexibleCustomSig(pert.file.name.new)
+```
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+Figure out the drugs common between all 3 layers. Again, the new perturbation layer is most limiting, so we use that instead of the old layer.
+
+```{r}
+layers <- list(sens=rownames(sens.data), pert=colnames(pert.data.new), strc=names(strc.data))
+common.drugs <- Reduce(intersect, layers)
+```
+
+
+## Create Similarity Matrices
+
+Computing the similarities (correlations) for the sensitivity layer is slow (have to merge correlations and keep track of how many samples were used to compute each correlation). Also, computing the similarities for the new perturbation signatures is very slow (in the case of using RV coefficient). Due to the two previously mentioned sentences, `sens.data` is actually a similarity matrix, and `pert.data.new` is also a similarity matrix, not a feature matrix. 
+
+Thus, the only similarity matrices we need to create are for the old perturbation signatures, and the structure layer.
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+
+pert.cor.old <- cor(pert.data.old[, common.drugs], method="pearson", use="pairwise.complete.obs")
+pert.cor.new <- pert.data.new[common.drugs, common.drugs]
+
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
+rownames(strc.cor) <- names(strc.data[common.drugs])
+colnames(strc.cor) <- names(strc.data[common.drugs])
+```
+
+
+## Performance Evalution
+
+### Old Signatures
+
+Now we need to take the previous similarity matrices, convert them into affinity matrices and fuse them using SNF
+
+```{r}
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.old, strc=strc.cor)
+    
+affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
+
+integrated <- SNFtool::SNF(affinity.matrices)
+rownames(integrated) <- common.drugs
+colnames(integrated) <- common.drugs
+```
+
+#### CTRPv2 Benchmark
+
+```{r, fig.width=5, fig.height=5}
+CompDrugTargetBenchmarkFlexible(common.drugs, "temp", affinity.matrices$strc,
+                                    affinity.matrices$sens, affinity.matrices$pert, integrated, NULL, NULL,
+                                    "target.roc.file.name", use.ctrpv2=T,
+                                    use.clue=F, use.chembl=F, use.dbank=F, use.dtc=F)
+```
+
+#### Combined CTRPv2, CLUE, CHEMBL Benchmark
+
+```{r, fig.width=5, fig.height=5}
+CompDrugTargetBenchmarkFlexible(common.drugs, "temp", affinity.matrices$strc,
+                                    affinity.matrices$sens, affinity.matrices$pert, integrated, NULL, NULL,
+                                    "target.roc.file.name", use.ctrpv2=T,
+                                    use.clue=T, use.chembl=T, use.dbank=F, use.dtc=F)
+```
+
+### New Signatures 
+
+Now we need to take the previous similarity matrices, convert them into affinity matrices and fuse them using SNF
+
+```{r}
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+    
+affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
+
+integrated <- SNFtool::SNF(affinity.matrices)
+rownames(integrated) <- common.drugs
+colnames(integrated) <- common.drugs
+```
+
+####  CTRPv2 Benchmark
+
+```{r, fig.width=5, fig.height=5}
+CompDrugTargetBenchmarkFlexible(common.drugs, "temp", affinity.matrices$strc,
+                                    affinity.matrices$sens, affinity.matrices$pert, integrated, NULL, NULL,
+                                    "target.roc.file.name", use.ctrpv2=T,
+                                    use.clue=F, use.chembl=F, use.dbank=F, use.dtc=F)
+```
+
+#### Combined CTRPv2. CLUE, CHEMBL Benchmark
+
+```{r, fig.width=5, fig.height=5}
+CompDrugTargetBenchmarkFlexible(common.drugs, "temp", affinity.matrices$strc,
+                                    affinity.matrices$sens, affinity.matrices$pert, integrated, NULL, NULL,
+                                    "target.roc.file.name", use.ctrpv2=T,
+                                    use.clue=T, use.chembl=T, use.dbank=F, use.dtc=F)
+```
+

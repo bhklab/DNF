@@ -1,0 +1,133 @@
+---
+title: "Drugs With Worst Self-Correlation Across Sensivity Datasets"
+output: html_notebook
+---
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+## Load Libraries and Sensitivity Datasets
+
+```{r}
+rm(list=ls())
+library(PharmacoGx)
+library(survcomp)
+library(ggplot2)
+
+source('./RCode/meta_analysis/getDisagreementBetweenDatasets.R')
+source('./RCode/meta_analysis/visualizeDatasetDiscrepancies.R')
+source('./RCode/meta_analysis/meta_analysis_helpers.R')
+load("PSets/CCLE_hs.RData")
+load("PSets/gCSI_hs.RData")
+load("PSets/CTRPv2.RData")
+load("PSets/GDSC1000.RData")
+load("PSets/FIMM.RData")
+
+# badchars are characters to be removed from drug names. This list of characters was determined 
+# by Nehme.
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+
+datasets <- list(CCLE, gCSI, GDSC1000, CTRPv2, FIMM)
+```
+
+## Combine AUCs from Datasets Into A Single Dataframe
+
+We determine the names of all the drugs across the various datasets, as well as the names of all the cell lines and 
+
+```{r}
+cell.lines <- sort(unique(unlist(sapply(datasets, function(x) { return (cellNames(x)) }))))
+drugs <- unique(unlist(sapply(datasets, 
+                              function(x) {
+                                  drug.names <- drugNames(x)
+                                  combos.removed <- drug.names[!grepl(":", drug.names)]
+                                  return (paste(pSetName(x), gsub(badchars, "",toupper(combos.removed)), sep=":::")) 
+                              })))
+
+### Merge datasets into one large matrix where rows are drugs (prepended with the corresponding dataset),
+### and columns are cell lines
+aucs.all <- CreateAucsAll(datasets, drugs, cell.lines = cell.lines, badchars = badchars)
+```
+
+## Create Correlation Matrix
+
+Now we find the correlations of all these drugs with each other. At this point every drug name is preprended by the name of the dataset that it came from. This allows us to see the discrepancy between drux x in dataset 1 and drug x in dataset 2.
+
+```{r}
+aucs.cor <- cor(x=aucs.all, method="pearson", use="pairwise.complete.obs")
+percentage.of.na <- sum(is.na(aucs.cor)) / (nrow(aucs.cor) * ncol(aucs.cor))
+print(paste("Percentage of NAs in correlation:", percentage.of.na, sep=" "))
+
+aucs.cor <- apply(aucs.cor, 1, function(x) ifelse(is.na(x),0,x)) # For now we 0 out any NA values. Might be better to impute with mean or median, though there are very little missing values so it doesn't really matter.
+```
+
+## Find Duplicated Drug Correlations
+
+For the drugs that are found in multiple datasets, we get a list where each list element is a matrix containing all possible correlations of a given drug with itself across all the datasets that is can be found in.
+
+```{r}
+aucs.drugs <- sapply(strsplit(rownames(aucs.cor), ":::"), function (x) { return (x[[2]])})
+aucs.dupl <- sort(unique(aucs.drugs[duplicated(aucs.drugs)]))
+aucs.drugs2 <- sort(unique(aucs.drugs))
+
+self.discrepancies <- list()
+for (i in 1:length(aucs.dupl)) {
+    iix <- paste(sapply(datasets, pSetName), aucs.dupl[i], sep=":::")
+    iix <- intersect(iix, colnames(aucs.all))
+    self.discrepancies[[i]] <- aucs.cor[iix, iix]
+}
+
+names(self.discrepancies) <- aucs.dupl
+```
+
+## Plot Worst Drugs
+
+We begin by computing the median correlation for each drug. This is what we'll use to determine which drugs to include in the boxplot
+
+```{r}
+worst.drugs.median <- lapply(self.discrepancies, function(x) {
+    relevant.values <- x[upper.tri(x, diag=F)]
+    
+    return(median(relevant.values))
+})
+
+worst.drugs.median <- unlist(worst.drugs.median)
+```
+
+Since we are using ggplot2 to create our plot, we need to make a dataframe containing the data found in `self.discrepancies`. Keep in mind that for each matrix in `self.discrepancies` there is redundant information. First of all, the diagonal is useless since it's always 1. More over, the matrix is symmetric, so we resort to only taking the upper triangle of each matrix as the values to include in our data frame.
+
+```{r}
+boxplot.data <- lapply(self.discrepancies, function(x) {
+    x[upper.tri(x, diag=F)]
+})
+
+df <- data.frame(drug.name=rep(names(boxplot.data), sapply(boxplot.data, length)),
+                 correlation=unlist(boxplot.data), stringsAsFactors=F)
+bad.drugs <- head(names(worst.drugs.median)[sort(worst.drugs.median, index.return=T)$ix], 25)
+
+df <- df[df$drug.name %in% bad.drugs, ]
+```
+
+Now we create the plot
+
+```{r}
+p <- ggplot(data=df, aes(drug.name, correlation))
+p <- p + geom_boxplot()
+p <- p + theme(axis.text.x=element_text(angle=90,hjust=1))
+p <- p + ggtitle("Drugs With Most Inconsistent Correlations")
+p <- p + xlab("Drug Name")
+p <- p + ylab("Correlation")
+p
+```
+
+## Plot Dataset Pair Discrepancies
+
+Let's look at the self-correlation discrepancies between pairs of datasets to see which dataset pairs have the worst correlations (for drug x in dataset 1 and drug x in dataset 2).
+
+```{r}
+num.samples.used = ComputeNumSamplesUsed(aucs.all, aucs.cor)
+dataset.pairs <- GetDisagreementsBetweenDatasets(self.discrepancies = self.discrepancies)
+unlisted.num.samples <- unlist(sapply(names(sapply(dataset.pairs, names)), GetNumSamplesForDatasetPairs, dataset.pairs = dataset.pairs, num.samples.used = num.samples.used))
+VisualizeDatasetDiscrepancies(dataset.pairs = dataset.pairs, unlisted.num.samples = unlisted.num.samples)   
+```
+
