@@ -358,37 +358,25 @@ AddNewImagingFeatures <- function(existing.features, existing.similarities, new.
     existing.features
 }
 
-UploadFeaturesForNewCompound <-  function(new.features, new.compound.name) {
-    # Pretend like there is some global list of file names
-    # features is a list where the name of each list element is the layer type
-    # and the values are the features for the new compound corresponding to 
-    # the said layer type
-
-    structure.features <- NULL
-    perturbation.features <- NULL
-    sensitivity.features <- NULL
-    imaging.features <- NULL
+AddDrugToExistingSimilarities <-  function(feature.file.paths, similarity.file.paths, new.features, new.compound.name) {
+    existing.features <- lapply(feature.file.paths, function(file.path) {
+        if (!is.null(file.path)) {
+            return(readRDS(file.path))
+        } else {
+            return(NULL)
+        }
+    })
     
-    structure.features <- LoadStructureFeatures(feature.file.paths[['structure']])
-    perturbation.features <- LoadPerturbationFeatures(feature.file.paths[['perturbation']])
-    sensitivity.features <- LoadSensitivityFeatures(feature.file.paths[['sensitivity']])
-    #imaging.features <- LoadImagingFeatures(feature.file.paths[['imaging']])
-
-    existing.features <- list(sensitivity=sensitivity.features, perturbation=perturbation.features,
-                              structure=structure.features, imaging=imaging.features)
+    existing.similarities <- lapply(similarity.file.paths, function(file.path) {
+        if (!is.null(file.path)) {
+            return(readRDS(file.path))
+        } else {
+            return(NULL)
+        }
+    })
     
-    structure.similarities <- NULL
-    perturbation.similarities <- NULL
-    sensitivity.similarities <- NULL
-    imaging.similarities <- NULL
-        
-    structure.similarities <- LoadStructureSimilarities(similarity.file.paths[['structure']])
-    perturbation.similarities <- LoadPerturbationSimilarities(similarity.file.paths[['perturbation']])
-    sensitivity.similarities <- LoadSensitivitySimilarities(similarity.file.paths[['sensitivity']])
-    # imaging.similarities <- LoadImagingSimilarities(similarity.file.paths[['imaging']])
-    
-    existing.similarities <- list(sensitivity=sensitivity.similarities, perturbation=perturbation.similarities,
-                                  structure=structure.similarities, imaging=imaging.similarities)
+    existing.features[sapply(existing.features, is.null)] <- NULL
+    existing.similarities[sapply(existing.similarities, is.null)] <- NULL
     
     # We iterate over the features for the new drug and add the features to the 
     # apporpriate layers. Then, for the layers that we didn't add features to,
@@ -429,29 +417,6 @@ UploadFeaturesForNewCompound <-  function(new.features, new.compound.name) {
         }
     }
     
-    # Now for the layers that the user didn't upload data for, we can use our predictive models
-    # to infer the values for these layers. We should never have to infer values for the structure
-    # layer however. Structure information should always be available for a compound.
-    # For now, since we don't have all the necessary models built yet, we can just impute using
-    # missForest. However, this approach probably will give worse results than a predictive model.
-    # Furthermore, imputation can't be used for more than one drug. This is because if we have 2 or
-    # more NA rows, those drugs will probably end up getting the same imputed values, so they will have
-    # exactly the same features, and end getting a drug-drug similarity score of 1! Maybe the clustering
-    # approach would be best, though it remains to be determined.
-    
-    # c1 <- makeCluster(8)
-    # registerDoParallel(c1)
-    # for (layer in names(new.features)) {
-    #     if (!is.null(new.features[[layer]])) {
-    #         next()
-    #     }
-    # 
-    #     # Like we said above, for now we just impute data until we have some proper predictive models.
-    # 
-    #     new.row <- numeric(ncol(existing.features[[layer]]))
-    #     existing.features[[layer]] <- rbind(existing.features[[layer]], new.row)
-    #     rownames(existing.features[[layer]])[nrow(existing.features[[layer]])] <- new.compound.name
-    #     existing.features[[layer]] <- missForest::missForest(existing.features[[layer]], maxiter=10,
-    #                                                          parallelize = 'variables')
-    # }
+    res <- list(similarities=existing.similarities)
+    return(res)
 }

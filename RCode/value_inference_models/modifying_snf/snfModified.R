@@ -6,6 +6,7 @@ library(reshape2)
 library(caret)
 library(SNFtool)
 library(org.Hs.eg.db)
+library(ROCR)
 source("RCode/flexible_layers/sensitivityDataFlexible.R")
 source("RCode/flexible_layers/perturbationDataFlexible.R")
 source("RCode/flexible_layers/structureDataFlexible.R")
@@ -67,6 +68,8 @@ correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
 
 augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
 augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, correlation.matrices)
+
+# augmented.matrices <- ReplaceCorrelationValues(augmented.matrices, correlation.matrices, all.drugs)
 affinity.matrices <- CreateAffinityMatrices(augmented.matrices)
 affinity.matrices <- ReplaceAffinityMatrixValuesFast(affinity.matrices, correlation.matrices, all.drugs)
 
