@@ -64,11 +64,11 @@ Load in senstivity, imaging data as well as perturbation signatures
 ```{r}
 pert.file.name <- "Data/L1000_compound_signatures.RData"
 sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
-imaging.file.name <- "Data/imaging_processed/imaging_full_no_normalization.rds"
+imaging.file.name <- "Data/imaging_processed/imaging_full_scaled.rds"
 
 sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
 pert.data <- PerturbationDataFlexible(pert.file.name, lincs.meta)  ## 978 X 23
-imaging.data <- ImagingDataFlexible(badchars)
+imaging.data <- ImagingDataFlexible(badchars, imaging.file.name)
 
 imaging.data <- imaging.data[, colnames(imaging.data) %in% colnames(sens.data)]
 
@@ -117,7 +117,7 @@ pert.cor <- cor(pert.data[, common.drugs], method="pearson", use="pairwise.compl
 sens.cor <- sens.data[common.drugs, common.drugs]
 ```
 
-## Integrate Network and Evaluate Performance
+## Integrate Network
 
 ```{r}
 all.drugs <- common.drugs
@@ -134,9 +134,58 @@ affinity.matrices <- medianSimilarity(affinity.matrices)
 integrated <- SNFtool::SNF(affinity.matrices)
 rownames(integrated) <- all.drugs
 colnames(integrated) <- all.drugs
+```
 
-paste("-----Evaluating Performance on ", i, "imputed drugs-----", sep=" ")
+## Evaluate Performance With Imaging
 
+### On CTRPv2 Drug Target Dataset
+
+```{r, fig.width=5, fig.height=5}
+CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
+                                strc.aff.mat=affinity.matrices$strc, 
+                                sens.aff.mat=affinity.matrices$sens, pert.aff.mat=affinity.matrices$pert,
+                                integration=integrated, luminex.aff.mat=NULL,
+                                imaging.aff.mat=affinity.matrices$imaging, target.roc.file.name="blessed_roc.pdf",
+                                use.ctrpv2=TRUE, use.clue=FALSE, use.chembl=FALSE, 
+                                use.dbank=FALSE, use.dtc=FALSE)
+```
+
+### On Combined CTRPv2, CLUE, CHEMBL Drug Target Dataset
+
+```{r, fig.width=5, fig.height=5}
+CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
+                                strc.aff.mat=affinity.matrices$strc, 
+                                sens.aff.mat=affinity.matrices$sens, pert.aff.mat=affinity.matrices$pert,
+                                integration=integrated, luminex.aff.mat=NULL,
+                                imaging.aff.mat=affinity.matrices$imaging, target.roc.file.name="blessed_roc.pdf",
+                                use.ctrpv2=TRUE, use.clue=TRUE, use.chembl=TRUE, 
+                                use.dbank=FALSE, use.dtc=FALSE)
+```
+
+## Evaluate Performance Without Imaging
+
+First, we have to recreate the network with the imaging layer removed
+
+```{r}
+all.drugs <- common.drugs
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
+
+affinity.matrices <- CreateAffinityMatrices(correlation.matrices)
+augmented.matrices <- CreateAugmentedMatrixSkeletons(names(correlation.matrices), all.drugs)
+augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, affinity.matrices)
+affinity.matrices <- ReplaceAffinityMatrixValuesFast(augmented.matrices, correlation.matrices, 
+                                                     all.drugs)
+affinity.matrices <- medianSimilarity(affinity.matrices)
+
+integrated <- SNFtool::SNF(affinity.matrices)
+rownames(integrated) <- all.drugs
+colnames(integrated) <- all.drugs
+```
+
+### On CTRPv2 Drug Target Dataset
+
+```{r, fig.width=5, fig.height=5}
 CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
                                 strc.aff.mat=affinity.matrices$strc, 
                                 sens.aff.mat=affinity.matrices$sens, pert.aff.mat=affinity.matrices$pert,
@@ -146,3 +195,18 @@ CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
                                 use.dbank=FALSE, use.dtc=FALSE)
 ```
 
+### On Combined CTRPv2, CLUE, CHEMBL Drug Target Dataset
+
+```{r, fig.width=5, fig.height=5}
+CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
+                                strc.aff.mat=affinity.matrices$strc, 
+                                sens.aff.mat=affinity.matrices$sens, pert.aff.mat=affinity.matrices$pert,
+                                integration=integrated, luminex.aff.mat=NULL,
+                                imaging.aff.mat=NULL, target.roc.file.name="blessed_roc.pdf",
+                                use.ctrpv2=TRUE, use.clue=TRUE, use.chembl=TRUE, 
+                                use.dbank=FALSE, use.dtc=FALSE)
+```
+
+## Conclusion
+
+As can be seen in the above plots, there is no significant improvement in AUC when we include the imaging layer. This suggests that the added complexity of having it as another layer is not worth the slight performance boost gain, which very well could just be noise
