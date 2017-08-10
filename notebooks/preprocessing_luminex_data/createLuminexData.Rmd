@@ -1,0 +1,125 @@
+---
+title: "Create Luminex Data"
+output: html_notebook
+---
+
+This notebook contains chunks that create the data for the luminex layer given the raw features and metadata. It attempts several different normalization methods for the sake of later on showing that normalization doesn't have much of an effect
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+## Load Data
+
+We begin by loading in the L1000 metadata which will help us assign drug names to the drugs from the luminex dataset.
+
+```{r, echo=FALSE}
+rm(list=ls())
+library(ggplot2)
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+```
+
+Next, we load in the luminex data and luminex metadata
+
+```{r, echo=FALSE}
+luminex.meta <- read.delim("Data/Broad.HG005032.ProfilingData/luminex/cdrp.l1000.meta.cpd.txt", stringsAsFactors = FALSE)
+luminex <- read.delim("Data/Broad.HG005032.ProfilingData/luminex/cdrp.l1000.profiles.txt", stringsAsFactors = FALSE)
+```
+
+## Clean Drug Names
+
+Now we can clean up the names found in the L1000 metadata as well as the cell painting metadata
+
+```{r, echo=FALSE}
+# Clean names and IDs
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+lincs.meta$pert_id <- toupper(lincs.meta$pert_id)
+lincs.meta$pert_id <- gsub(badchars, "", lincs.meta$pert_id)
+luminex.meta$name <- toupper(luminex.meta$name)
+luminex.meta$name <- gsub(badchars, "", luminex.meta$name)
+```
+
+Get rid of the control compound from the luminex data. Replace the luminex BROAD IDs with the corresponding drug names, and get rid of dupes by just taking the first occurrance of every drug
+
+```{r}
+luminex <- luminex[luminex$BROAD_ID != "DMSO", ]
+
+for (brd in unique(luminex$BROAD_ID)) {
+    drug.name <- luminex.meta[match(brd, luminex.meta$BROAD_ID), 'name']
+    
+    if (!is.na(drug.name)) {
+        luminex$BROAD_ID[luminex$BROAD_ID %in% brd] <- drug.name    
+    }
+}
+
+luminex <- luminex[!duplicated(luminex$BROAD_ID), ]
+rownames(luminex) <- luminex$BROAD_ID
+luminex <- luminex[, -1]
+```
+
+## Data Investigation
+
+Let's see how a random sample of 20 features are distributed by creating a density plot for each one
+
+```{r}
+cols <- sample(1:ncol(luminex), 20)
+
+p <- ggplot(data=luminex) + stat_density(aes_string(x=colnames(luminex)[cols[1]]))
+
+for (i in 2:length(cols)) {
+    p <- p + stat_density(aes_string(x=colnames(luminex)[cols[i]]), color=i)
+}
+
+p
+```
+
+## Scaling Data
+
+```{r}
+luminex.scaled <- scale(luminex)
+luminex.scaled <- as.data.frame(luminex.scaled)
+
+cols <- sample(1:ncol(luminex.scaled), 20)
+
+p <- ggplot(data=luminex.scaled) + stat_density(aes_string(x=colnames(luminex.scaled)[cols[1]]))
+
+for (i in 2:length(cols)) {
+    p <- p + stat_density(aes_string(x=colnames(luminex.scaled)[cols[i]]), color=i)
+}
+
+p
+```
+
+## PCA Data
+
+Now we need to look into using just the top 50 features as the basis for later on going to compute similarities with. This is an attempt to remove noise
+
+```{r}
+num.components <- 50
+luminex.pca <- prcomp(luminex, center=TRUE, scale=TRUE)
+top.components <- predict(luminex.pca, newdata=luminex)[, 1:num.components]
+```
+
+
+## Saving Data 
+
+Now that we have both the scaled and unscaled versions of the data, let's save them to file. First, we transpose so that drugs are columns and features are rows.
+
+```{r}
+luminex <- as.matrix(luminex)
+luminex <- t(luminex)
+
+luminex.scaled <- as.matrix(luminex.scaled)
+luminex.scaled <- t(luminex.scaled)
+
+top.components <- as.matrix(top.components)
+top.components <- t(top.components)
+
+saveRDS(luminex, "Data/luminex_processed/luminex_full_no_normalization.rds")
+saveRDS(luminex.scaled, "Data/luminex_processed/luminex_full_scaled.rds")
+saveRDS(top.components, "Data/luminex_processed/luminex_50_pca.rds")
+```
+
