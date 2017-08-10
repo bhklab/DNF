@@ -40,6 +40,10 @@ CreateAffinityMatrices <- function(augmented.matrices) {
 }
 
 ReplaceAffinityMatrixValuesFast <- function(affinity.matrices, correlation.matrices, all.drugs) {
+    if (length(affinity.matrices) == 1) {
+        return(affinity.matrices)
+    }
+    
     for (i in 1:length(all.drugs)) {
         drug.name <- all.drugs[i]
         
