@@ -1,0 +1,274 @@
+---
+title: "Investigating Poorly Performing Drugs"
+output: html_notebook
+---
+
+## Description
+
+This notebook looks at the drugs that are misclassified when using the KNN target prediction method, as well as the AUC benchmark method. We begin with the KNN method since that is the simplest to analyze
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+set.seed(9833)
+
+library(ggplot2)
+library(ROCR)
+library(reshape2)
+library(caret)
+library(SNFtool)
+library(org.Hs.eg.db)
+library(doParallel)
+library(foreach)
+library(missForest)
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/knn/knnHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+
+source("notebooks/investigating_difficult_drugs/badPerformerHelpers.R")
+
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+### Load Data For Layers
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Now to load in the sensitivity correlations and the pert signatures
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+pert.data.old <- PerturbationDataFlexible("Data/L1000_compound_signatures.RData", lincs.meta)  ## 978 X 23
+pert.data.new <- PerturbationDataFlexibleCustomSig("Data/pert_sigs_6_hour/pert_features_full.RData")
+
+```
+
+Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+### Find Common Drugs
+
+Notice how we aren't including the pert layer when determining the common drugs. We already know that it is missing 8 drugs, so those drugs will just be imputed later on.
+
+```{r}
+layers <- list(sens.names = sort(colnames(sens.data)), 
+               strc.names = names(strc.data))
+common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+print(length(common.drugs))
+```
+
+### Create Similarity Matrices
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+So the senstivity data is already a correlation matrix, therefore there is nothing to do there. We just need to compute the similarities for the pert layer on both the old and new signatures, as well as the structure layer.
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+
+pert.cor.new <- cor(pert.data.new[, intersect(common.drugs, colnames(pert.data.new))], method="pearson", use="pairwise.complete.obs")
+
+registerDoParallel(4)
+# Impute missing data
+pert.cor.new <- missForest(pert.cor.new, maxiter=10, parallelize = "variables")$ximp
+
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
+rownames(strc.cor) <- names(strc.data[common.drugs])
+colnames(strc.cor) <- names(strc.data[common.drugs])
+```
+
+### Integrate Layers
+
+Impute the drugs that are missing from the perturbation layer and integrate the layers
+
+```{r}
+integrations <- list()
+all.drugs <- common.drugs
+
+layer.1 <- c("sens", "pert", "strc")
+layer.2 <- c("sens", "pert", "strc")
+layer.3 <- c("sens", "pert", "strc")
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+
+for (l.1 in layer.1) {
+    temp.cor.matrices <- correlation.matrices[l.1]
+    
+    affinity.matrices <- CreateAffinityMatrices(temp.cor.matrices)
+    augmented.matrices <- CreateAugmentedMatrixSkeletons(names(temp.cor.matrices), all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, affinity.matrices)
+    affinity.matrices <- medianSimilarity(augmented.matrices)
+    
+    integrations[[l.1]] <- affinity.matrices[[1]]
+}
+
+for (i in 1:length(layer.1)) {
+    for (j in 1:length(layer.2)) {
+        if (j <= i) {
+            next()
+        }
+        
+        l.1 <- layer.1[i]
+        l.2 <- layer.2[j]
+        
+        temp.cor.matrices <- correlation.matrices[c(l.1, l.2)]
+            
+        integrated <- IntegrateCorrelationMatrices(correlation.matrices[c(l.1, l.2)], all.drugs)
+        
+        integrations[[paste(l.1, l.2, sep="-")]] <- integrated
+    }
+}
+
+integrations[["strc-sens-pert"]] <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+
+
+```
+
+### Find Poorly Performing Drugs
+
+We first determine the neighbours of the misclassified drugs
+
+```{r}
+k <- 10
+
+mistakes <- list()
+
+for (combo in names(integrations)) {
+    temp <- GetKNNAccuracy(k, integrations[[combo]], data.bench)
+    
+    temp <- temp[temp == 0]
+    
+    mistakes[[combo]] <- names(temp)
+}
+```
+
+### See Difference Between Different Intergrations
+
+For now, we look at the difference between the full integrated layer and the rest of the layers.
+
+```{r}
+fully.integrated <- mistakes$`strc-sens-pert`
+
+cat("Mistakes made by fully integrated network\n")
+print(fully.integrated)
+
+
+for (i in 1:(length(mistakes) - 1)) {
+    l.1.name <- names(mistakes)[i]
+    l.1 <- mistakes[[i]]
+    
+    cat(paste("Mistakes in common with:", l.1.name, "\n"))
+    print(intersect(l.1, fully.integrated))
+}
+```
+
+The above output suggests that of 32 the mistakes being made by the fully integrated network, 22 of them are in common with the mistakes made by the senstivity layer on its own. 
+
+Now, let's analyze quantiatively how many mistakes are being made by each layer by creating a bar graph.
+
+```{r}
+df.data <- unlist(lapply(mistakes, length))
+df.data <- sort(df.data, decreasing=T)
+df.data <- cbind(names(df.data), df.data)
+colnames(df.data) <- c("layer.combo", "num.mistakes")
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+df.data$num.mistakes <- as.numeric(df.data$num.mistakes)
+
+p <- ggplot(data=df.data, aes(x=reorder(layer.combo, num.mistakes, FUN = function(x) - x), y=num.mistakes))
+p <- p + geom_bar(aes(fill=as.factor(layer.combo)), stat="identity")
+p <- p + geom_text(aes(label=num.mistakes), vjust=1.6, color="white")
+p <- p + ggtitle("Mistakes Made By Various Layer Combos")
+p <- p + xlab("Layer Combo")
+p
+```
+
+The above graph shows us basically what we expected in terms of the model making less mistakes as more layers are added to it. It's interesting to note that the sensitivity layer on its own performs better than the sensitivity layer combined with the perturbation layer
+
+Lastly, let's visualize the mistakes in common between the full integration and the other combos.
+
+```{r}
+df.data <- lapply(mistakes[-length(mistakes)], function(x) {
+    length(intersect(x, fully.integrated))
+})
+df.data <- unlist(df.data)
+df.data <- sort(df.data, decreasing=T)
+df.data <- cbind(names(df.data), df.data)
+colnames(df.data) <- c("layer.combo", "mistakes.in.common")
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+df.data[, 2] <- as.numeric(df.data[, 2])
+
+p <- ggplot(data=df.data, aes(x=reorder(layer.combo, mistakes.in.common, FUN = function(x) - x), y=mistakes.in.common))
+p <- p + geom_bar(aes(fill=as.factor(layer.combo)), stat="identity")
+p <- p + geom_text(aes(label=mistakes.in.common), vjust=1.6, color="white")
+p <- p + ggtitle("Mistakes In Common Between Full Network And Other Combos")
+p <- p + xlab("Layer Combo")
+p
+```
+
+
+### Find Poorly Performing Targets
+
+For each drug that was not correctly predicted according to our top 5 accuracy metric, we will add that drug's true targets to a count vector
+
+```{r}
+bad.targets <- numeric(length(target.names))
+names(bad.targets) <- target.names
+
+for (i in bad.performers) {
+    true.targets <- data.bench$TARGET_NAME[data.bench$MOLECULE_NAME == i]
+    
+    bad.targets[true.targets] <- bad.targets[true.targets] + 1
+}
+
+bad.targets <- bad.targets[bad.targets != 0]
+```
+

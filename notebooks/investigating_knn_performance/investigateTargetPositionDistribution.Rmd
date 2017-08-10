@@ -1,0 +1,251 @@
+---
+title: "Identifying Target Position Distribution"
+output: html_notebook
+---
+
+## Description 
+
+We investigate the distribution of target position (in the vector of predicted targets for a given drug). The aim is to determine how reliable certain positions are, and to hopefully confirm that positions farther from one decrease in reliability. By the end, there should be a density plot or histogram showing a positively skewed distribution
+
+## Experiments on CTRPv2 Drug Target Dataset
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+set.seed(9833)
+
+library(plotly)
+library(ggplot2)
+library(ROCR)
+library(reshape2)
+library(caret)
+library(SNFtool)
+library(org.Hs.eg.db)
+library(doParallel)
+library(foreach)
+library(missForest)
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/knn/knnHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+
+source("notebooks/investigating_knn_performance/targetPositionDistributionHelpers.R")
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+## Experiments on CTRPv2 Drug Target Data
+
+### Load Data For Layers
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Now to load in the sensitivity correlations and the pert signatures
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+pert.data.new <- PerturbationDataFlexibleCustomSig("Data/pert_sigs_6_hour/pert_features_full.RData")
+```
+
+Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+### Find Common Drugs
+
+Notice how we aren't including the pert layer when determining the common drugs. We already know that it is missing 8 drugs, so those drugs will just be imputed later on.
+
+```{r}
+layers <- list(sens.names = sort(colnames(sens.data)), 
+               strc.names = names(strc.data))
+common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+print(length(common.drugs))
+```
+
+### Create Similarity Matrices
+
+So the senstivity data is already a correlation matrix, therefore there is nothing to do there. We just need to compute the similarities for the pert layer on both the old and new signatures, as well as the structure layer.
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+
+pert.cor.new <- cor(pert.data.new[, intersect(common.drugs, colnames(pert.data.new))], method="pearson", use="pairwise.complete.obs")
+
+registerDoParallel(4)
+# Impute missing data
+pert.cor.new <- missForest(pert.cor.new, maxiter=10, parallelize = "variables")$ximp
+
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
+rownames(strc.cor) <- names(strc.data[common.drugs])
+colnames(strc.cor) <- names(strc.data[common.drugs])
+```
+
+### Integrate Layers
+
+```{r}
+all.drugs <- common.drugs
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+
+integrated <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+```
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+### Get The Top Target Predictions
+
+For  various values of k, get the top target predictions for each drug. 
+
+```{r}
+num.neighbours <- 5:20
+top <- 10
+
+predictions <- GetTargetIndices(integrated, data.bench, num.neighbours, top)
+```
+
+### Determine Distributions
+
+```{r}
+distributions <- DetermineTargetDistributions(predictions, data.bench, num.neighbours, top)
+```
+
+### Get Accuracies 
+
+```{r}
+accuracies <- c()
+
+for (k in num.neighbours) {
+    acc <- GetKNNAccuracy(k, integrated, data.bench)
+    
+    acc <- sum(acc) / length(acc)
+    
+    accuracies <- c(accuracies, acc)
+}
+
+accuracies <- sapply(accuracies, function(x) {rep(x, top)})
+accuracies <- as.vector(accuracies)
+```
+
+
+### Create Dataframe for ggplot
+
+```{r}
+df.data <- CreateTargetDistDataForGGPlot(distributions, accuracies, num.neighbours, top)
+```
+
+### Plot The Results
+
+```{r, fig.height=10, fig.width=10}
+p <- ggplot(data=df.data, aes(x=index, y=counts))
+p <- p + geom_bar(stat="identity")
+p <- p + facet_wrap(~ k, ncol=3)
+p <- p + ggtitle("Correct Target Positions For Various Values of K")
+p <- p + xlab("Target Index")
+p
+```
+
+## Experiments on Combined Drug Target Dataset
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=TRUE, use.chembl=TRUE, use.dbank=TRUE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+### Get The Top Target Predictions
+
+For  various values of k, get the top target predictions for each drug. 
+
+```{r}
+num.neighbours <- 5:20
+top <- 10
+
+predictions <- GetTargetIndices(integrated, data.bench, num.neighbours, top)
+```
+
+### Determine Distributions
+
+```{r}
+distributions <- DetermineTargetDistributions(predictions, data.bench, num.neighbours, top)
+```
+
+### Get Accuracies 
+
+```{r}
+accuracies <- c()
+
+for (k in num.neighbours) {
+    acc <- GetKNNAccuracy(k, integrated, data.bench)
+    
+    acc <- sum(acc) / length(acc)
+    
+    accuracies <- c(accuracies, acc)
+}
+
+accuracies <- sapply(accuracies, function(x) {rep(x, top)})
+accuracies <- as.vector(accuracies)
+```
+
+
+### Create Dataframe for ggplot
+
+```{r}
+df.data <- CreateTargetDistDataForGGPlot(distributions, accuracies, num.neighbours, top)
+```
+
+### Plot The Results
+
+```{r, fig.height=10, fig.width=10}
+p <- ggplot(data=df.data, aes(x=index, y=counts))
+p <- p + geom_bar(stat="identity")
+p <- p + facet_wrap(~ k, ncol=3)
+p <- p + ggtitle("Correct Target Positions For Various Values of K")
+p <- p + xlab("Target Index")
+p
+```
