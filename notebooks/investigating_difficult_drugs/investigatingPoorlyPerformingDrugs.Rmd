@@ -1,11 +1,15 @@
 ---
 title: "Investigating Poorly Performing Drugs"
-output: html_notebook
+output:
+  html_document: default
+  html_notebook: default
 ---
 
 ## Description
 
 This notebook looks at the drugs that are misclassified when using the KNN target prediction method, as well as the AUC benchmark method. We begin with the KNN method since that is the simplest to analyze
+
+## Experiments on CTRPv2 Drug Target Dataset
 
 ```{r setup}
 knitr::opts_knit$set(root.dir=normalizePath("../../"))
@@ -24,8 +28,8 @@ library(caret)
 library(SNFtool)
 library(org.Hs.eg.db)
 library(doParallel)
-library(foreach)
 library(missForest)
+
 source("RCode/flexible_layers/sensitivityDataFlexible.R")
 source("RCode/flexible_layers/perturbationDataFlexible.R")
 source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
@@ -67,9 +71,7 @@ Now to load in the sensitivity correlations and the pert signatures
 sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
 
 sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
-pert.data.old <- PerturbationDataFlexible("Data/L1000_compound_signatures.RData", lincs.meta)  ## 978 X 23
 pert.data.new <- PerturbationDataFlexibleCustomSig("Data/pert_sigs_6_hour/pert_features_full.RData")
-
 ```
 
 Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.
@@ -195,7 +197,7 @@ for (combo in names(integrations)) {
 
 For now, we look at the difference between the full integrated layer and the rest of the layers.
 
-```{r}
+```{r, eval=F}
 fully.integrated <- mistakes$`strc-sens-pert`
 
 cat("Mistakes made by fully integrated network\n")
@@ -236,6 +238,8 @@ The above graph shows us basically what we expected in terms of the model making
 Lastly, let's visualize the mistakes in common between the full integration and the other combos.
 
 ```{r}
+fully.integrated <- mistakes$`strc-sens-pert`
+
 df.data <- lapply(mistakes[-length(mistakes)], function(x) {
     length(intersect(x, fully.integrated))
 })
@@ -259,7 +263,7 @@ p
 
 For each drug that was not correctly predicted according to our top 5 accuracy metric, we will add that drug's true targets to a count vector
 
-```{r}
+```{r, eval=F}
 bad.targets <- numeric(length(target.names))
 names(bad.targets) <- target.names
 
@@ -272,3 +276,94 @@ for (i in bad.performers) {
 bad.targets <- bad.targets[bad.targets != 0]
 ```
 
+## Experiments on Combined Drug Target Dataset
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=TRUE, use.chembl=TRUE, use.dbank=TRUE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+### Find Poorly Performing Drugs
+
+We first determine the neighbours of the misclassified drugs
+
+```{r}
+k <- 10
+
+mistakes <- list()
+
+for (combo in names(integrations)) {
+    temp <- GetKNNAccuracy(k, integrations[[combo]], data.bench)
+    
+    temp <- temp[temp == 0]
+    
+    mistakes[[combo]] <- names(temp)
+}
+```
+
+### See Difference Between Different Intergrations
+
+For now, we look at the difference between the full integrated layer and the rest of the layers.
+
+```{r, eval=F}
+fully.integrated <- mistakes$`strc-sens-pert`
+
+cat("Mistakes made by fully integrated network\n")
+print(fully.integrated)
+
+
+for (i in 1:(length(mistakes) - 1)) {
+    l.1.name <- names(mistakes)[i]
+    l.1 <- mistakes[[i]]
+    
+    cat(paste("Mistakes in common with:", l.1.name, "\n"))
+    print(intersect(l.1, fully.integrated))
+}
+```
+
+The above output suggests that of 32 the mistakes being made by the fully integrated network, 22 of them are in common with the mistakes made by the senstivity layer on its own. 
+
+Now, let's analyze quantiatively how many mistakes are being made by each layer by creating a bar graph.
+
+```{r}
+df.data <- unlist(lapply(mistakes, length))
+df.data <- sort(df.data, decreasing=T)
+df.data <- cbind(names(df.data), df.data)
+colnames(df.data) <- c("layer.combo", "num.mistakes")
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+df.data$num.mistakes <- as.numeric(df.data$num.mistakes)
+
+p <- ggplot(data=df.data, aes(x=reorder(layer.combo, num.mistakes, FUN = function(x) - x), y=num.mistakes))
+p <- p + geom_bar(aes(fill=as.factor(layer.combo)), stat="identity")
+p <- p + geom_text(aes(label=num.mistakes), vjust=1.6, color="white")
+p <- p + ggtitle("Mistakes Made By Various Layer Combos")
+p <- p + xlab("Layer Combo")
+p
+```
+
+The above graph shows us basically what we expected in terms of the model making less mistakes as more layers are added to it. It's interesting to note that the sensitivity layer on its own performs better than the sensitivity layer combined with the perturbation layer
+
+Lastly, let's visualize the mistakes in common between the full integration and the other combos.
+
+```{r}
+fully.integrated <- mistakes$`strc-sens-pert`
+
+df.data <- lapply(mistakes[-length(mistakes)], function(x) {
+    length(intersect(x, fully.integrated))
+})
+df.data <- unlist(df.data)
+df.data <- sort(df.data, decreasing=T)
+df.data <- cbind(names(df.data), df.data)
+colnames(df.data) <- c("layer.combo", "mistakes.in.common")
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+df.data[, 2] <- as.numeric(df.data[, 2])
+
+p <- ggplot(data=df.data, aes(x=reorder(layer.combo, mistakes.in.common, FUN = function(x) - x), y=mistakes.in.common))
+p <- p + geom_bar(aes(fill=as.factor(layer.combo)), stat="identity")
+p <- p + geom_text(aes(label=mistakes.in.common), vjust=1.6, color="white")
+p <- p + ggtitle("Mistakes In Common Between Full Network And Other Combos")
+p <- p + xlab("Layer Combo")
+p
+```

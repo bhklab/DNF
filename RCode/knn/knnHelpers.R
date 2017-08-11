@@ -91,7 +91,7 @@ CountTargetsFromNeighbours <- function(neighbours, weights, data.bench,
             
             relevant.targets <- data.bench[data.bench$MOLECULE_NAME == neighbour.name, "TARGET_NAME"]
             
-            if (scale.distance == TRUE & k > 1) {
+            if (scale.distance == TRUE & ncol(counts) > 1) {
                 counts[drug, relevant.targets] <- counts[drug, relevant.targets] + (sigmoid(weights[i, j]))    
             } else {
                 counts[drug, relevant.targets] <- counts[drug, relevant.targets] + (weights[i, j])

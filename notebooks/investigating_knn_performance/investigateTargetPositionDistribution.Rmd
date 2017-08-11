@@ -1,6 +1,8 @@
 ---
 title: "Identifying Target Position Distribution"
-output: html_notebook
+output:
+  html_document: default
+  html_notebook: default
 ---
 
 ## Description 
@@ -26,8 +28,8 @@ library(caret)
 library(SNFtool)
 library(org.Hs.eg.db)
 library(doParallel)
-library(foreach)
 library(missForest)
+
 source("RCode/flexible_layers/sensitivityDataFlexible.R")
 source("RCode/flexible_layers/perturbationDataFlexible.R")
 source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
@@ -48,6 +50,7 @@ source("RCode/knn/drugTargetsKNN.R")
 source("RCode/goldenberg_imputation/medianSimilarity.R")
 
 source("notebooks/investigating_knn_performance/targetPositionDistributionHelpers.R")
+source("notebooks/investigating_difficult_drugs/badPerformerHelpers.R")
 
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
 ```

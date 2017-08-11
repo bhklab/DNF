@@ -1,6 +1,8 @@
 ---
 title: "Investigate Predictiveness of Imaging Layer"
-output: html_notebook
+output:
+  html_document: default
+  html_notebook: default
 ---
 
 Now that we have our imputation method, we can see if the imaging layer helps AUC, without looking at a benchmark that is reduced in terms of drugs.
@@ -22,6 +24,9 @@ library(reshape2)
 library(caret)
 library(SNFtool)
 library(org.Hs.eg.db)
+library(missForest)
+library(doParallel)
+
 source("RCode/flexible_layers/sensitivityDataFlexible.R")
 source("RCode/flexible_layers/perturbationDataFlexible.R")
 source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
@@ -62,12 +67,12 @@ lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
 Load in senstivity, imaging data as well as perturbation signatures
 
 ```{r}
-pert.file.name <- "Data/L1000_compound_signatures.RData"
+pert.file.name <- "Data/pert_sigs_6_hour/pert_features_full.RData"
 sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
 imaging.file.name <- "Data/imaging_processed/imaging_full_scaled.rds"
 
 sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
-pert.data <- PerturbationDataFlexible(pert.file.name, lincs.meta)  ## 978 X 23
+pert.data <- PerturbationDataFlexibleCustomSig(pert.file.name)  ## 978 X 23
 imaging.data <- ImagingDataFlexible(badchars, imaging.file.name)
 
 imaging.data <- imaging.data[, colnames(imaging.data) %in% colnames(sens.data)]
@@ -93,10 +98,10 @@ strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elem
 
 Now to find the drugs that are common between all layers
 
-Now we can choose the layers to be used in the integration and see the drugs that are common between them
+Now we can choose the layers to be used in the integration and see the drugs that are common between them. Leave out pert names from the intersection since we know that the pert layer is missing 8 drugs compared to the strc layer, so we'll use our imputation method to get a full integrated network of 365 drugs instead of 357 drugs.
 
 ```{r}
-layers <- list(sens.names = sort(colnames(sens.data)), pert.names=colnames(pert.data),
+layers <- list(sens.names = sort(colnames(sens.data)),
                strc.names = names(strc.data))
 common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
 print(length(common.drugs))
@@ -111,8 +116,14 @@ strc.cor <- fingerprint::fp.sim.matrix(strc.data, method = "tanimoto")
 colnames(strc.cor) <- names(strc.data)
 rownames(strc.cor) <- names(strc.data)
 
+strc.cor <- strc.cor[common.drugs, common.drugs]
+
 imaging.cor <- ConstImagingLayerFlexible(imaging.data)
-pert.cor <- cor(pert.data[, common.drugs], method="pearson", use="pairwise.complete.obs")
+pert.cor <- cor(pert.data[, intersect(common.drugs, colnames(pert.data))], method="pearson", use="pairwise.complete.obs")
+
+registerDoParallel(4)
+# Impute missing data
+pert.cor <- missForest(pert.cor, maxiter=10, parallelize = "variables")$ximp
 
 sens.cor <- sens.data[common.drugs, common.drugs]
 ```
@@ -150,7 +161,7 @@ CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
                                 use.dbank=FALSE, use.dtc=FALSE)
 ```
 
-### On Combined CTRPv2, CLUE, CHEMBL Drug Target Dataset
+### On Combined CTRPv2, CLUE, CHEMBL, Drugbank Drug Target Dataset
 
 ```{r, fig.width=5, fig.height=5}
 CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
@@ -159,7 +170,7 @@ CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
                                 integration=integrated, luminex.aff.mat=NULL,
                                 imaging.aff.mat=affinity.matrices$imaging, target.roc.file.name="blessed_roc.pdf",
                                 use.ctrpv2=TRUE, use.clue=TRUE, use.chembl=TRUE, 
-                                use.dbank=FALSE, use.dtc=FALSE)
+                                use.dbank=TRUE, use.dtc=FALSE)
 ```
 
 ## Evaluate Performance Without Imaging
@@ -204,7 +215,7 @@ CompDrugTargetBenchmarkFlexible(common.drugs=common.drugs, gmt.file.name="temp",
                                 integration=integrated, luminex.aff.mat=NULL,
                                 imaging.aff.mat=NULL, target.roc.file.name="blessed_roc.pdf",
                                 use.ctrpv2=TRUE, use.clue=TRUE, use.chembl=TRUE, 
-                                use.dbank=FALSE, use.dtc=FALSE)
+                                use.dbank=TRUE, use.dtc=FALSE)
 ```
 
 ## Conclusion
