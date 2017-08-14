@@ -1,0 +1,227 @@
+---
+title: "Analyzing KNN Top 5 Ties"
+output: html_notebook
+---
+
+## Description
+
+In this notebook we look at what happens when we include ties in the "top 5" predicted targets. This means looking at the vote count of the final target in the top 5 list and adding any other targets that also have that vote count. So this could potentially increase the number of predicted targets by quite a bit, but its only fair considering that we have this weighted vote based system. 
+
+## Experiments on CTRPv2 Drug Target Dataset
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+set.seed(9833)
+
+library(plotly)
+library(ggplot2)
+library(ROCR)
+library(reshape2)
+library(caret)
+library(SNFtool)
+library(org.Hs.eg.db)
+library(doParallel)
+library(missForest)
+
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/knn/knnHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+
+source("notebooks/investigating_knn_performance/targetPositionDistributionHelpers.R")
+source("notebooks/investigating_difficult_drugs/badPerformerHelpers.R")
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+## Experiments on CTRPv2 Drug Target Data
+
+### Load Data For Layers
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Now to load in the sensitivity correlations and the pert signatures
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+pert.data.new <- PerturbationDataFlexibleCustomSig("Data/pert_sigs_6_hour/pert_features_full.RData")
+```
+
+Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+### Find Common Drugs
+
+Notice how we aren't including the pert layer when determining the common drugs. We already know that it is missing 8 drugs, so those drugs will just be imputed later on.
+
+```{r}
+layers <- list(sens.names = sort(colnames(sens.data)), 
+               strc.names = names(strc.data))
+common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+print(length(common.drugs))
+```
+
+### Create Similarity Matrices
+
+So the senstivity data is already a correlation matrix, therefore there is nothing to do there. We just need to compute the similarities for the pert layer on both the old and new signatures, as well as the structure layer.
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+
+pert.cor.new <- cor(pert.data.new[, intersect(common.drugs, colnames(pert.data.new))], method="pearson", use="pairwise.complete.obs")
+
+registerDoParallel(4)
+# Impute missing data
+pert.cor.new <- missForest(pert.cor.new, maxiter=10, parallelize = "variables")$ximp
+
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
+rownames(strc.cor) <- names(strc.data[common.drugs])
+colnames(strc.cor) <- names(strc.data[common.drugs])
+```
+
+### Integrate Layers
+
+```{r}
+all.drugs <- common.drugs
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+
+integrated <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+```
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+### Include Ties in Top 5 Accuracy
+
+```{r}
+k <- 5
+top <- 5
+
+drugs.with.targets <- sort(unique(data.bench$MOLECULE_NAME))
+    
+temp <- GetNearestNeighbours(k, integrated, drugs.with.targets)
+
+neighbours <- temp$neighbours
+weights <- temp$weights
+
+counts <- CountTargetsFromNeighbours(neighbours, weights, data.bench, 
+                                     scale.distance=F, extra.scaling=100)
+
+top.predictions <- sapply(1:nrow(counts), function(i, target.names, drugs.with.targets) {
+    x <- counts[i, ]
+    sorted <- sort(x, index.return=T, decreasing=T)
+    index.of.predictions <- head(sorted$ix[sorted$x > 0], top)
+    
+    lowest.vote <- x[index.of.predictions][top]
+    num.ties <- length(x[x == lowest.vote]) - 1
+    index.of.predictions <- head(sorted$ix[sorted$x > 0], top + num.ties)
+    
+    res <- list()
+    res[[drugs.with.targets[i]]] <- x[index.of.predictions]
+    names(res[[drugs.with.targets[i]]]) <- target.names[index.of.predictions]
+    res
+}, target.names=colnames(counts), drugs.with.targets=rownames(counts))
+
+new.prediction.status <- EvaluatePredictionAccuracy(top.predictions, data.bench)
+
+new.acc <- sum(new.prediction.status) / length(new.prediction.status)
+
+old.prediction.status <- GetKNNAccuracy(k, integrated, data.bench)
+
+print(new.prediction.status[new.prediction.status != old.prediction.status])
+```
+
+
+## Experiments on Combined Drug Target Data
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=TRUE, use.chembl=TRUE, use.dbank=TRUE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+```{r}
+k <- 5
+top <- 5
+
+drugs.with.targets <- sort(unique(data.bench$MOLECULE_NAME))
+    
+temp <- GetNearestNeighbours(k, integrated, drugs.with.targets)
+
+neighbours <- temp$neighbours
+weights <- temp$weights
+
+counts <- CountTargetsFromNeighbours(neighbours, weights, data.bench, 
+                                     scale.distance=F, extra.scaling=100)
+
+top.predictions <- sapply(1:nrow(counts), function(i, target.names, drugs.with.targets) {
+    x <- counts[i, ]
+    sorted <- sort(x, index.return=T, decreasing=T)
+    index.of.predictions <- head(sorted$ix[sorted$x > 0], top)
+    
+    lowest.vote <- x[index.of.predictions][top]
+    num.ties <- length(x[x == lowest.vote]) - 1
+    index.of.predictions <- head(sorted$ix[sorted$x > 0], top + num.ties)
+    
+    res <- list()
+    res[[drugs.with.targets[i]]] <- x[index.of.predictions]
+    names(res[[drugs.with.targets[i]]]) <- target.names[index.of.predictions]
+    res
+}, target.names=colnames(counts), drugs.with.targets=rownames(counts))
+
+new.prediction.status <- EvaluatePredictionAccuracy(top.predictions, data.bench)
+
+new.acc <- sum(new.prediction.status) / length(new.prediction.status)
+
+old.prediction.status <- GetKNNAccuracy(k, integrated, data.bench)
+
+print(new.prediction.status[new.prediction.status != old.prediction.status])
+```

@@ -1,0 +1,141 @@
+---
+title: "Test Modified C Index on Old DNF"
+output: html_notebook
+---
+
+## Description
+
+We investigate the use of Zhaleh's modified C index on the old version of DNF to see if it improves the performance of the senstitivity layer.
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+```{r, echo=F, message=F}
+rm(list=ls())
+
+source('./RCode/preprocessInput.R')
+source('./RCode/sensitivityData.R')
+source('./RCode/perturbationData.R')
+source('./RCode/structureData.R')
+source('./RCode/constStructureLayer.R')
+source('./RCode/constSensitivityLayer.R')
+source('./RCode/constPerturbationLayer.R')
+source('./RCode/integrateStrctSensPert.R')
+source('./RCode/drugTargetBench.R')
+source('./RCode/generateDrugPairs.R')
+source('./RCode/compConcordIndx.R')
+source('./RCode/generateRocPlot.R')
+source('./RCode/generatePRPlot.R')
+source('./RCode/predPerf.R')
+source('./RCode/ATCbench.R')
+source('./RCode/communityGen.R')
+source('./RCode/cindexComp2.R')
+source('./RCode/pairedConcordanceIndex.R')
+
+library(PharmacoGx)
+library(apcluster)
+library(rcdk)
+library(fingerprint)
+library(annotate)
+library(org.Hs.eg.db)
+library(SNFtool)
+library(ROCR)
+library(survcomp)
+library(reshape2)
+library(proxy)
+library(PRROC)
+
+library(apcluster)
+
+load("Psets/CTRPv2.RData")
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+## Experiments
+
+### Loading Data
+
+```{r}
+cDrugs <- preprocessInput(dname="ctrpv2", "lincs")
+dim(cDrugs)  ##239 X 28
+# Process Sensitivity, Perturbation, and Structure layers for set of common drugs
+sensData <- sensitivityData("ctrpv2", cDrugs)  ## 645 X 239
+dim(sensData)
+pertData <- perturbationData("lincs", cDrugs, "ctrpv2")  ## 978 X 239
+dim(pertData)
+strcData <- structureData("lincs", cDrugs)  ## a vector  --> 239 elemnts
+length(strcData)
+
+## Get the common drugs (239) among the 3 datasets/layers
+commonDrugs <- Reduce(intersect,list(sort(names(strcData)),sort(colnames(sensData)),
+                                      sort(colnames(pertData))))
+length(commonDrugs) ## 239 ..
+
+strcData<- strcData[commonDrugs] # 239 drugs
+sensData <- sensData[,commonDrugs] # 645 x 239 drugs
+pertData<- pertData[,commonDrugs] #978 genes x  239 
+```
+
+```{r}
+mapping.table <- read.csv("./Data/drugs_with_ids.csv", header=TRUE, stringsAsFactors = FALSE)
+
+sens.data.new <- summarizeSensitivityProfiles(pSet=CTRPv2, sensitivity.measure="auc_recomputed")
+sens.data.new <- t(sens.data.new)
+
+for (i in 1:ncol(sens.data.new)) {
+    drug.name = colnames(sens.data.new)[i]
+    relevant.row <- mapping.table[which(mapping.table[,"unique.drugid"] == drug.name),]
+    
+    replace.value <- relevant.row[1, paste("CTRPv2", "drugid", sep = ".")]
+    
+    if (!is.na(replace.value)) {
+        colnames(sens.data.new)[i] <- replace.value        
+    }
+}
+
+colnames(sens.data.new)[colnames(sens.data.new) == "N-{3-Chloro-4-[(3-fluorobenzyl)oxy]phenyl}-6-[5-({[2-(methylsulfonyl)ethyl]amino}methyl)-2-furyl]-4-quinazolinamine"] <- "LAPATINIB"
+
+colnames(sens.data.new) <- toupper(colnames(sens.data.new))
+colnames(sens.data.new) <- gsub(badchars, "", colnames(sens.data.new))
+
+sens.data.new <- sens.data.new[, commonDrugs]
+```
+
+
+### Constructing Old Sensitivity Layer
+
+```{r}
+sensAffMat.old <- constSensitivityLayer(sensData)
+```
+
+### Constructing New Sensitivity Layer
+
+```{r}
+sens.aff.mat.new <- matrix(NA, nrow=length(commonDrugs), ncol=length(commonDrugs))
+rownames(sens.aff.mat.new) <- commonDrugs
+colnames(sens.aff.mat.new) <- commonDrugs
+
+for (i in 1:nrow(sens.aff.mat.new)) {
+    f1 <- sens.data.new[, i]
+    
+    for (j in (i+1):ncol(sens.aff.mat.new)) {
+        f2 <- sens.data.new[, j]
+        
+        temp <- f1 & f2
+        temp[temp == FALSE] <- NA
+        if (all(is.na(temp))) {
+            sens.aff.mat.new[i, j] <- NA    
+        } else {
+            c.index <- PairedConcordanceIndex(f1, f2)
+            sens.aff.mat.new[i, j] <- c.index    
+        }
+        print(j)
+    }
+    
+    
+}
+```
+
+

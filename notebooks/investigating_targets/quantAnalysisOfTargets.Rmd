@@ -1,0 +1,119 @@
+---
+title: "Quantitative Analysis of Targets"
+output: html_notebook
+---
+
+## Description
+
+This notebook takes a look a various statistics regarding drug target datasets.
+
+## Experiments
+
+### Load Data
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+set.seed(9833)
+
+library(plotly)
+library(ggplot2)
+library(ROCR)
+library(reshape2)
+library(caret)
+library(SNFtool)
+library(org.Hs.eg.db)
+library(doParallel)
+library(foreach)
+library(missForest)
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+```
+
+```{r}
+common.drugs <- intersect(rownames(sens.data), lincs.meta$pert_iname)
+```
+
+### Get Drug Targets
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=TRUE, use.chembl=TRUE, use.dbank=TRUE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+```
+
+### Targets With Most Drugs
+
+Let's look at the top 10 targets in terms of most drugs.
+
+```{r}
+top.10.targets <- sapply(unique(data.bench$TARGET_NAME), function(t, df) {
+    num <- df[df$TARGET_NAME == t, ]
+    num <- nrow(num)
+    return(num)
+}, df=data.bench)
+
+top.10.targets <- head(sort(top.10.targets, decreasing=T), 10)
+
+df.data <- data.frame(target=names(top.10.targets), count=top.10.targets)
+
+
+p <- ggplot(data=df.data, aes(x=reorder(target, -count), y=count))
+p <- p + geom_bar(stat="identity")
+p
+```
+Now let's see the names of these drugs. Perhaps there is an obvious pattern
+
+```{r}
+drugs.in.top.10.targets <- data.bench[data.bench$TARGET_NAME %in% names(top.10.targets), ]
+View(drugs.in.top.10.targets)
+```
+
+### Drugs with the most targets
+
+```{r}
+top.10.drugs <- sapply(unique(data.bench$MOLECULE_NAME), function(drug, df) {
+    num <- df[df$MOLECULE_NAME == drug, ]
+    num <- nrow(num)
+    return(num)
+}, df=data.bench)
+
+top.10.drugs <- head(sort(top.10.drugs, decreasing=T), 10)
+df.data <- data.frame()
+
+```
+
+
+
+
+
