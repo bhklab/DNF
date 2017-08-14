@@ -8,6 +8,7 @@ library(UniProt.ws)
 library(extrafont)
 library("org.Hs.eg.db")
 library(reactome.db)
+library(jsonlite)
 source("RCode/exploratory_analysis/targetDiffHelpers.R")
 
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
@@ -104,9 +105,12 @@ uniprot.targets <- uniprot.targets[!(uniprot.targets$TARGET_NAME == ""), ]
 ### which have disagreeing targets. I.e. dataset 1 says the target for 
 ### some Drug X is JAK1, while dataset 2 says that the target for 
 ### Drug X is MAP3K4.
+# all.datasets <- list(ctrp.drug.targets=ctrp.drug.targets,
+#                      clue.targets=clue.targets, uniprot.targets=uniprot.targets,
+#                      dtc.targets=dtc.targets, chembl.drug.targets=chembl.drug.targets)
 all.datasets <- list(ctrp.drug.targets=ctrp.drug.targets,
                      clue.targets=clue.targets, uniprot.targets=uniprot.targets,
-                     dtc.targets=dtc.targets, chembl.drug.targets=chembl.drug.targets)
+                     chembl.drug.targets=chembl.drug.targets)
 discrepancy.counts <- list()
 xx <- as.list(reactomeEXTID2PATHID)
 
@@ -124,7 +128,7 @@ for (i in 1:length(all.datasets)) {
             
             discrepancy.counts[[pair.name]] <- c()
             
-            discrepancy.counts <- GetTargetDiscrepanciesPathway(d1, d2, common.drugs, discrepancy.counts, pair.name)
+            discrepancy.counts <- GetTargetDiscrepanciesLenient(d1, d2, common.drugs, discrepancy.counts, pair.name)
         }
     }    
 }
