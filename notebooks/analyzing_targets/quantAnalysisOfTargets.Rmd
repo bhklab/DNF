@@ -20,23 +20,19 @@ rm(list=ls())
 
 set.seed(9833)
 
-library(plotly)
+library(reactome.db)
+library(extrafont)
+loadfonts(device="win")
 library(ggplot2)
 library(ROCR)
 library(reshape2)
-library(caret)
-library(SNFtool)
 library(org.Hs.eg.db)
-library(doParallel)
-library(foreach)
-library(missForest)
+
 source("RCode/flexible_layers/sensitivityDataFlexible.R")
 source("RCode/flexible_layers/perturbationDataFlexible.R")
 source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
 source("RCode/flexible_layers/structureDataFlexible.R")
-source("RCode/flexible_layers/imagingDataFlexible.R")
 
-source("RCode/flexible_layers/constImagingLayerFlexible.R")
 source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
 source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
 source("RCode/flexible_layers/constStructureLayerFlexible.R")
@@ -101,7 +97,7 @@ View(drugs.in.top.10.targets)
 
 ### Drugs with the most targets
 
-```{r}
+```{r, fig.height=6, fig.width=9}
 top.10.drugs <- sapply(unique(data.bench$MOLECULE_NAME), function(drug, df) {
     num <- df[df$MOLECULE_NAME == drug, ]
     num <- nrow(num)
@@ -109,10 +105,69 @@ top.10.drugs <- sapply(unique(data.bench$MOLECULE_NAME), function(drug, df) {
 }, df=data.bench)
 
 top.10.drugs <- head(sort(top.10.drugs, decreasing=T), 10)
-df.data <- data.frame()
+
+df.data <- data.bench[data.bench$MOLECULE_NAME %in% names(top.10.drugs), ]
+df.data$count <- NA
+
+for (drug in df.data$MOLECULE_NAME) {
+    df.data[df.data$MOLECULE_NAME == drug, "count"] <- top.10.drugs[drug]
+}
+
+df.data$MOLECULE_NAME <- factor(df.data$MOLECULE_NAME)
+
+p <- ggplot()
+
+for (drug in unique(df.data$MOLECULE_NAME)) {
+    df.sub <- df.data[df.data$MOLECULE_NAME == drug, ]
+    
+    p <- p + geom_bar(data=df.sub, aes(x=MOLECULE_NAME), stat="count")
+    p <- p + geom_text(data=df.sub, aes(x=MOLECULE_NAME, label=paste(TARGET_NAME, collapse="\n"), y=count / 2), stat="identity", color="white", family="Helvetica")
+}
+
+p <- p
+p
 
 ```
 
+### Pathway Level Grouping
+
+What if we group these very similar targets into pathways so that we don't have what are essentially duplicates? 
+
+```{r}
+temp.targets <- data.bench$TARGET_NAME[data.bench$MOLECULE_NAME == "TAMOXIFEN"]
+
+temp.entrez <- unlist(mget(temp.targets, org.Hs.egSYMBOL2EG))
+
+temp.pathways <- AnnotationDbi::select(reactome.db,
+                      keys=temp.entrez,
+                      keytype="ENTREZID",
+                      columns=c("ENTREZID","REACTOMEID","PATHNAME"))
+
+pathways <- list()
+for (entrez in unique(temp.pathways$ENTREZID)) {
+    temp <- temp.pathways[temp.pathways$ENTREZID == entrez, "REACTOMEID"]
+    pathways[[entrez]] <- temp
+}
+
+new.targets <- list()
+
+for (entrez in names(pathways)) {
+    temp.1 <- pathways[[entrez]]
+    
+    for (j in setdiff(names(pathways), entrez)) {
+        temp.2 <- pathways[[j]]
+        
+        intersection <- sort(intersect(temp.1, temp.2))
+        
+        if (length(intersection) > 0) {
+            new.targets[[entrez]] <- intersection[[1]]
+        }
+    }
+}
+
+new.targets <- unlist(new.targets)
+new.targets <- unique(new.targets)
+```
 
 
 
