@@ -1,167 +1,27 @@
-rm(list=ls())
-
-source("RCode/flexible_layers/drugTargetBenchFlexible.R")
-source("RCode/flexible_layers/knn/drugTargetsKNN.R")
-source("RCode/flexible_layers/compConcordIndxFlexible.R")
-source("RCode/flexible_layers/generateROCPlotFlexible.R")
-source("RCode/predPerf.R")
-source("RCode/knn/knnHelpers.R")
-
-integrated <- readRDS("integrated.RData")
-badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
-common.drugs <- colnames(integrated)
-gmt.file.name <- "temp_gmt"
-use.ctrpv2 <- FALSE
-use.clue <- FALSE
-use.chembl <- FALSE
-use.dbank <- FALSE
-use.dtc <- TRUE
-
-data.bench <- DrugTargetsKNN(common.drugs, 
-                             gmt.file.name, use.ctrpv2=use.ctrpv2,
-                             use.clue=use.clue, use.chembl=use.chembl,
-                             use.dbank=use.dbank, use.dtc=use.dtc) # 141 x 141 drug-drug adjacency matrix --> 141
-data.bench[] <- lapply(data.bench, as.character)
-
-num.targets <- length(unique(data.bench$TARGET_NAME))
-drug.names <- sort(unique(data.bench$MOLECULE_NAME))
-target.names <- sort(unique(data.bench$TARGET_NAME))
-
-integrated <- integrated[drug.names, drug.names]
-
-best.setting <- c(TRUE, 2)
-best.accuracy = 0.0
-
-for (scale.distance in c(TRUE)) {
-    for (k in 2:20) {
-        for (extra in c(10, 20, 50, 75, 2000)) {
-            print(paste("Setting:", "scale.distance =", scale.distance, "k=", k, sep=" "))
-            accuracy <- Main(k, scale.distance, extra)
-            print(paste("Accuracy:", accuracy, sep=" "))
-            
-            if (accuracy > best.accuracy) {
-                best.accuracy <- accuracy
-                best.setting <- c(scale.distance, k, extra)
-            }   
-        }
-    }    
-}
-
-print(paste("Best accuracy:", best.accuracy, sep=" "))
-print(paste("Best setting:", best.setting, sep=" "))
-
-Main <- function(k, scale.distance, extra) {
-    counts <- matrix(data=0, nrow=length(drug.names), ncol=num.targets)
-    rownames(counts) <- drug.names
-    colnames(counts) <- sort(unique(data.bench$TARGET_NAME))
+CreateLeaveOneOutNetworks <- function(integrated, correlation.matrices, all.drugs, data.bench) {
+    c1 <- makeCluster(8, outfile="")
+    registerDoParallel(c1)
     
-    # Neighbours is a a matirx of the shape NUM_DRUGS X K. 
-    # For example, a row looks like: Drug X     34 21 ... 10 4.
-    neighbours <- matrix(0, nrow=length(drug.names), ncol=k)
-    rownames(neighbours) <- drug.names
+    functions <- ListFunctions()
     
-    weights <- matrix(0, nrow=length(drug.names), ncol=k)
-    rownames(weights) <- drug.names
-    
-    # For each drug, obtain the indices of the k closest neighbours
-    # according to the integrated similarity measure. For some reason,
-    # using existing KNN packages gave different results (I guess they
-    # thought that rows corresponds to points and columns correspond to 
-    # dimensions).
-    for (i in 1:nrow(neighbours)) {
-        row <- integrated[i, ]
-        res <- sapply(sort(row, index.return=TRUE), '[')
-        res.indices <- res[, "ix"]
-        res.weights <- res[, 'x']
+    loo.networks <- foreach(drug=unique(data.bench$MOLECULE_NAME), .export=functions) %dopar% {
+        common.drugs.one.out <- setdiff(all.drugs, drug)
         
-        res.indices <- res.indices[(length(res.indices) - (k)):(length(res.indices) - 1)]
-        res.weights <- res.weights[(length(res.weights) - (k)):(length(res.weights) - 1)]
-        neighbours[i, ] <- res.indices
-        weights[i, ] <- res.weights
+        temp.correlation.matrices <- lapply(correlation.matrices, function(x) {
+            x[intersect(rownames(x), common.drugs.one.out), intersect(colnames(x), common.drugs.one.out)]
+        })    
+        
+        net.1 <- IntegrateCorrelationMatrices(correlation.matrices, common.drugs.one.out)
+        
+        net.2 <- integrated
+        net.2[rownames(net.1), colnames(net.1)] <- net.1
+        
+        net.2
     }
     
-    # Convert the indices of nearest neigbhours into the actual drug
-    # names of those neighbours.
-    neighbours <- apply(neighbours, 1, function(x) {drug.names[x]})
-    neighbours <- t(neighbours)
-    rownames(neighbours) <- drug.names
+    stopCluster(c1)
     
-    # Now if we want to weight the targets based on the similarities between drugs,
-    # we have to determine some kind of threshold. For example, if the similarity
-    # between drug X and drug Y is 0.003, and the similarity between drug X and drug
-    # Z is 0.001, we should definitely trust the targets coming from drug Y more than 
-    # those coming from drug Z.
+    names(loo.networks) <- unique(data.bench$MOLECULE_NAME)
     
-    # Iterate over each drug in the neighbours matrix. For each neighbour
-    # of a given drug, obtain that neighbour's drug targets and use those 
-    # targets to increment the counts matrix in the apporpriate location.
-    for (i in 1:nrow(neighbours)) {
-        drug <- rownames(neighbours)[i]
-        names.of.neighbours <- neighbours[i, ]
-        
-        max.x <- max(weights[i, ])
-        fudge.factor <- - extra * ((log(3)) / ((weights[i, ncol(weights) - 1] - weights[i, ncol(weights)]))) 
-        sigmoid <- function(z) {1 / (1 + exp(- fudge.factor * (z - max.x)))}
-        
-        for (j in 1:length(names.of.neighbours)) {
-            neighbour.name <- names.of.neighbours[j]
-            
-            relevant.targets <- data.bench[data.bench$MOLECULE_NAME == neighbour.name, "TARGET_NAME"]
-            
-            if (scale.distance == TRUE) {
-                counts[drug, relevant.targets] <- counts[drug, relevant.targets] + (sigmoid(weights[i, j]))    
-            } else {
-                counts[drug, relevant.targets] <- counts[drug, relevant.targets] + (weights[i, j])
-            }
-        }
-    }
-    
-    counts <- apply(counts, 1, function(x) {
-        indices <- which(x > 0)
-        res <- numeric(length(x))
-        res[indices] <- exp(x[indices]) / sum(exp(x[indices]))
-        res
-    })
-    
-    counts <- t(counts)
-    colnames(counts) <- sort(unique(data.bench$TARGET_NAME))
-    
-    top.predictions <- sapply(1:nrow(counts), function(i, target.names, drug.names) {
-        x <- counts[i, ]
-        sorted <- sort(x, index.return=T)
-        index.of.predictions <- tail(sorted$ix[sorted$x > 0], 5)
-        res <- list()
-        res[[drug.names[i]]] <- x[index.of.predictions]
-        names(res[[drug.names[i]]]) <- target.names[index.of.predictions]
-        res
-    }, target.names=colnames(counts), drug.names=rownames(counts))
-    
-    num.correct.predictions <- integer(nrow(counts))
-    names(num.correct.predictions) <- rownames(counts)
-    false.positive.targets <- integer(ncol(counts))
-    names(false.positive.targets) <- colnames(counts)
-    
-    for (i in 1:length(top.predictions)) {
-        drug.name <- names(top.predictions)[i]
-        target.names <- names(top.predictions[[i]])
-        
-        possible.true.targets <- data.bench[data.bench$MOLECULE_NAME == drug.name, "TARGET_NAME"]
-        
-        # print(paste("Drug Name", drug.name, sep=": "))
-        # print(paste("Predicted Targets", target.names, sep=": "))
-        # print(paste("Possible Targets", possible.true.targets, sep=": "))
-        
-        if (length(intersect(target.names, possible.true.targets)) > 0) {
-            num.correct.predictions[drug.name] <- 1
-        }
-        
-        false.positives <- setdiff(target.names, possible.true.targets)
-        if (length(false.positives) > 0) {
-            false.positive.targets[false.positives] <- false.positive.targets[false.positives] + 1
-        }
-    }
-    
-    accuracy <- sum(num.correct.predictions) / length(num.correct.predictions)
-    
-    accuracy
+    return(loo.networks)
 }

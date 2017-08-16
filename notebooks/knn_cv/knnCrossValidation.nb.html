@@ -184,18 +184,16 @@ $(document).ready(function () {
 <li>Evaluate the top 5 accuracy on X using the modified Net.2 from step 4</li>
 </ol>
 </div>
-<div id="performance-without-imputation" class="section level2">
-<h2>Performance Without Imputation</h2>
-<div id="using-ctrpv2-targets" class="section level3">
-<h3>Using ctrpv2 targets</h3>
+<div id="using-ctrpv2-targets" class="section level2">
+<h2>Using ctrpv2 targets</h2>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxua25pdHI6Om9wdHNfa25pdCRzZXQocm9vdC5kaXIgPSBub3JtYWxpemVQYXRoKCcuLicpKVxuZ2V0d2QoKVxuYGBgIn0= -->
-<pre class="r"><code>knitr::opts_knit$set(root.dir = normalizePath('..'))
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxua25pdHI6Om9wdHNfa25pdCRzZXQocm9vdC5kaXIgPSBub3JtYWxpemVQYXRoKCcuLi8uLi8nKSlcbmdldHdkKClcbmBgYCJ9 -->
+<pre class="r"><code>knitr::opts_knit$set(root.dir = normalizePath('../../'))
 getwd()</code></pre>
 <!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIFwiQzovVXNlcnMvYWxleHAvRG9jdW1lbnRzL3Jlc2VhcmNoL3N1bW1lcl8yMDE3L0RORi9ub3RlYm9va3NcIlxuIn0= -->
-<pre><code>[1] &quot;C:/Users/alexp/Documents/research/summer_2017/DNF/notebooks&quot;</code></pre>
+<!-- rnb-output-begin eyJkYXRhIjoiWzFdIFwiQzovVXNlcnMvYWxleHAvRG9jdW1lbnRzL3Jlc2VhcmNoL3N1bW1lcl8yMDE3L0RORi9ub3RlYm9va3Mva25uX2N2XCJcbiJ9 -->
+<pre><code>[1] &quot;C:/Users/alexp/Documents/research/summer_2017/DNF/notebooks/knn_cv&quot;</code></pre>
 <!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
@@ -205,16 +203,101 @@ getwd()</code></pre>
 <!-- rnb-chunk-begin -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
-<p>Let’s figure out the drugs in common between the 3 standard layers using the old perturbation signatures. By doing so, we can remove a drug one at a time.</p>
+<div id="load-data-for-layers" class="section level3">
+<h3>Load Data For Layers</h3>
+<p>We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2Vucy5kYXRhIDwtIHJlYWRSRFMoc2Vuc2l0aXZpdHkuZmlsZS5uYW1lKVxuY29tbW9uLmRydWdzIDwtIGludGVyc2VjdChjb2xuYW1lcyhzZW5zLmRhdGEpLCBsaW5jcy5tZXRhJHBlcnRfaW5hbWUpXG5gYGAifQ== -->
-<pre class="r"><code>sens.data &lt;- readRDS(sensitivity.file.name)
-common.drugs &lt;- intersect(colnames(sens.data), lincs.meta$pert_iname)</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGluY3MubWV0YSA8LSByZWFkLmNzdihcIkRhdGEvTElOQ1MuY3N2XCIsIHN0cmluZ3NBc0ZhY3RvcnMgPSBGQUxTRSlcbmxpbmNzLm1ldGEkcGVydF9pbmFtZSA8LSB0b3VwcGVyKGxpbmNzLm1ldGEkcGVydF9pbmFtZSlcbmxpbmNzLm1ldGEkcGVydF9pbmFtZSA8LSBnc3ViKGJhZGNoYXJzLCBcIlwiLCBsaW5jcy5tZXRhJHBlcnRfaW5hbWUpXG5gYGAifQ== -->
+<pre class="r"><code>lincs.meta &lt;- read.csv(&quot;Data/LINCS.csv&quot;, stringsAsFactors = FALSE)
+lincs.meta$pert_iname &lt;- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname &lt;- gsub(badchars, &quot;&quot;, lincs.meta$pert_iname)</code></pre>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
-<p>We determine the relevant drug targets for the drugs common between the layers. For now, we focus on targets from the ctrpv2 dataset.</p>
+<p>Now to load in the sensitivity correlations and the pert signatures</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2Vucy5kYXRhIDwtIFNlbnNpdGl2aXR5RGF0YUZsZXhpYmxlKHNlbnNpdGl2aXR5LmZpbGUubmFtZSlcbnBlcnQuZGF0YSA8LSBQZXJ0dXJiYXRpb25EYXRhRmxleGlibGVDdXN0b21TaWcocGVydC5maWxlLm5hbWUpXG5gYGAifQ== -->
+<pre class="r"><code>sens.data &lt;- SensitivityDataFlexible(sensitivity.file.name)
+pert.data &lt;- PerturbationDataFlexibleCustomSig(pert.file.name)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.</p>
+<p>Subset the lincs metadata file to only the drugs appearing in the sensitivity layer</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2Vucy5uYW1lcyA8LSByb3duYW1lcyhzZW5zLmRhdGEpXG5saW5jcy5tZXRhLnN1YnNldCA8LSBsaW5jcy5tZXRhW21hdGNoKHNlbnMubmFtZXMsIGxpbmNzLm1ldGEkcGVydF9pbmFtZSksXVxubGluY3MubWV0YS5zdWJzZXQgPC0gbGluY3MubWV0YS5zdWJzZXRbIWlzLm5hKGxpbmNzLm1ldGEuc3Vic2V0JFgpLF1cbmBgYCJ9 -->
+<pre class="r"><code>sens.names &lt;- rownames(sens.data)
+lincs.meta.subset &lt;- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset &lt;- lincs.meta.subset[!is.na(lincs.meta.subset$X),]</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>Now we create the structure fingerprints based on the subsetted lincs metadata</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3RyYy5kYXRhIDwtIFN0cnVjdHVyZURhdGFGbGV4aWJsZShsaW5jcy5tZXRhLnN1YnNldCkgICMjIGEgdmVjdG9yICAtLT4gMjM5IGVsZW1udHNcbmBgYCJ9 -->
+<pre class="r"><code>strc.data &lt;- StructureDataFlexible(lincs.meta.subset)  ## a vector  --&gt; 239 elemnts</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="find-common-drugs" class="section level3">
+<h3>Find Common Drugs</h3>
+<p>Notice how we aren’t including the pert layer when determining the common drugs. We already know that it is missing 8 drugs, so those drugs will just be imputed later on.</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGF5ZXJzIDwtIGxpc3Qoc2Vucy5uYW1lcyA9IHNvcnQoY29sbmFtZXMoc2Vucy5kYXRhKSksIFxuICAgICAgICAgICAgICAgc3RyYy5uYW1lcyA9IG5hbWVzKHN0cmMuZGF0YSkpXG5jb21tb24uZHJ1Z3MgPC0gUmVkdWNlKGludGVyc2VjdCwgRmlsdGVyKE5lZ2F0ZShpcy5udWxsKSxsYXllcnMpKVxucHJpbnQobGVuZ3RoKGNvbW1vbi5kcnVncykpXG5gYGAifQ== -->
+<pre class="r"><code>layers &lt;- list(sens.names = sort(colnames(sens.data)), 
+               strc.names = names(strc.data))
+common.drugs &lt;- Reduce(intersect, Filter(Negate(is.null),layers))
+print(length(common.drugs))</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NVxuIn0= -->
+<pre><code>[1] 365</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="create-similarity-matrices" class="section level3">
+<h3>Create Similarity Matrices</h3>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZGF0YS5iZW5jaCA8LSBEcnVnVGFyZ2V0c0tOTihjb21tb24uZHJ1Z3MsIGdtdF9maWxlX25hbWU9XCJ0ZW1wXCIsIHVzZS5jdHJwdjI9VFJVRSxcbiAgICAgICAgICAgICAgICAgICAgICAgIHVzZS5jbHVlPUZBTFNFLCB1c2UuY2hlbWJsPUZBTFNFLCB1c2UuZGJhbms9RkFMU0UsIHVzZS5kdGM9RkFMU0UpXG5kYXRhLmJlbmNoW10gPC0gbGFwcGx5KGRhdGEuYmVuY2gsIGFzLmNoYXJhY3RlcilcbmJlbmNobWFyay5kcnVncyA8LSB1bmlxdWUoZGF0YS5iZW5jaCRNT0xFQ1VMRV9OQU1FKVxuYGBgIn0= -->
+<pre class="r"><code>data.bench &lt;- DrugTargetsKNN(common.drugs, gmt_file_name=&quot;temp&quot;, use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] &lt;- lapply(data.bench, as.character)
+benchmark.drugs &lt;- unique(data.bench$MOLECULE_NAME)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>So the senstivity data is already a correlation matrix, therefore there is nothing to do there. We just need to compute the similarities for the pert layer on both the old and new signatures, as well as the structure layer.</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2Vucy5jb3IgPC0gc2Vucy5kYXRhW2NvbW1vbi5kcnVncywgY29tbW9uLmRydWdzXVxucGVydC5jb3IgPC0gY29yKHBlcnQuZGF0YVssIGludGVyc2VjdChjb21tb24uZHJ1Z3MsIGNvbG5hbWVzKHBlcnQuZGF0YSkpXSwgbWV0aG9kPVwicGVhcnNvblwiLCB1c2U9XCJwYWlyd2lzZS5jb21wbGV0ZS5vYnNcIilcbnBlcnQuY29yIDwtIG1lZGlhblNpbWlsYXJpdHkobGlzdChwZXJ0LmNvcikpW1sxXV1cbnN0cmMuY29yIDwtIGZpbmdlcnByaW50OjpmcC5zaW0ubWF0cml4KHN0cmMuZGF0YVtjb21tb24uZHJ1Z3NdLCBtZXRob2QgPSBcInRhbmltb3RvXCIpXG5yb3duYW1lcyhzdHJjLmNvcikgPC0gbmFtZXMoc3RyYy5kYXRhW2NvbW1vbi5kcnVnc10pXG5jb2xuYW1lcyhzdHJjLmNvcikgPC0gbmFtZXMoc3RyYy5kYXRhW2NvbW1vbi5kcnVnc10pXG5gYGAifQ== -->
+<pre class="r"><code>sens.cor &lt;- sens.data[common.drugs, common.drugs]
+pert.cor &lt;- cor(pert.data[, intersect(common.drugs, colnames(pert.data))], method=&quot;pearson&quot;, use=&quot;pairwise.complete.obs&quot;)
+pert.cor &lt;- medianSimilarity(list(pert.cor))[[1]]
+strc.cor &lt;- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = &quot;tanimoto&quot;)
+rownames(strc.cor) &lt;- names(strc.data[common.drugs])
+colnames(strc.cor) &lt;- names(strc.data[common.drugs])</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="integrate-layers" class="section level3">
+<h3>Integrate Layers</h3>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYWxsLmRydWdzIDwtIGNvbW1vbi5kcnVnc1xuY29ycmVsYXRpb24ubWF0cmljZXMgPC0gbGlzdChzZW5zPXNlbnMuY29yLCBwZXJ0PXBlcnQuY29yLCBzdHJjPXN0cmMuY29yKVxuaW50ZWdyYXRlZCA8LSBJbnRlZ3JhdGVDb3JyZWxhdGlvbk1hdHJpY2VzKGNvcnJlbGF0aW9uLm1hdHJpY2VzLCBhbGwuZHJ1Z3MpXG5gYGAifQ== -->
+<pre class="r"><code>all.drugs &lt;- common.drugs
+correlation.matrices &lt;- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
+integrated &lt;- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
 <!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZGF0YS5iZW5jaCA8LSBEcnVnVGFyZ2V0c0tOTihjb21tb24uZHJ1Z3MsIFxuICAgICAgICAgICAgICAgICAgICAgICAgICAgICBnbXQuZmlsZS5uYW1lLCB1c2UuY3RycHYyPVRSVUUsXG4gICAgICAgICAgICAgICAgICAgICAgICAgICAgIHVzZS5jbHVlPUZBTFNFLCB1c2UuY2hlbWJsPUZBTFNFLFxuICAgICAgICAgICAgICAgICAgICAgICAgICAgICB1c2UuZGJhbms9RkFMU0UsIHVzZS5kdGM9RkFMU0UpICMgMTQxIHggMTQxIGRydWctZHJ1ZyBhZGphY2VuY3kgbWF0cml4IC0tPiAxNDFcbmRhdGEuYmVuY2hbXSA8LSBsYXBwbHkoZGF0YS5iZW5jaCwgYXMuY2hhcmFjdGVyKVxuYGBgIn0= -->
@@ -226,1336 +309,178 @@ data.bench[] &lt;- lapply(data.bench, as.character)</code></pre>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
-<p>Now let’s loop over all the drugs in <code>data.bench</code> and execute the algo mentioned at the top of this notebook.</p>
+<p>The smartest way to do this so that things are efficient is to first compute all the different possible networks with one drug left out (only the drugs that are in the benchmark since those are the ones that we are evaluating performance on), and then later on go and see how different values of k affect accuracy. This way, we avoid recomputing the different networks for each value of k.</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZyA8LSBwcm9mdmlzKHtcbiAgICBpbnRlZ3JhdGVkLmFsbCA8LSBFdmFsdWF0ZU1vZGVsUk9DKHVzZS5zZW5zaXRpdml0eT1UUlVFLCB1c2UucGVydHVyYmF0aW9uPVRSVUUsIHVzZS5zdHJ1Y3R1cmU9VFJVRSxcbiAgICAgICAgdXNlLmltYWdpbmc9RkFMU0UsIHVzZS5sdW1pbmV4PUZBTFNFLCBcbiAgICAgICAgIHNlbnNpdGl2aXR5LmZpbGUubmFtZT1zZW5zaXRpdml0eS5maWxlLm5hbWUsIHBlcnQuZmlsZS5uYW1lPXBlcnQuZmlsZS5uYW1lLCBcbiAgICAgICAgbGluY3MubWV0YT1saW5jcy5tZXRhLFxuICAgICAgICAgYXRjLmJlbmNobWFyay5uYW1lPVwiY2hlbWJsLW5ld1wiLCBjb21wdXRlLmF0Yz1GQUxTRSwgdXNlLmN0cnB2Mj1UUlVFLCB1c2UuY2x1ZT1GQUxTRSxcbiAgICAgICAgIHVzZS5jaGVtYmw9RkFMU0UsIHVzZS5kYmFuaz1GQUxTRSwgdXNlLmR0Yz1GQUxTRSwgY3JlYXRlLmNvbW11bml0aWVzPUZBTFNFLCBiYXNlLmRpcj1cIk91dHB1dC9hdWNfcF9mbGV4XCIsIHBlcnQubmV3PUZBTFNFLCBjb21tb24uZHJ1Z3M9TlVMTCxcbiAgICAgICAgY29tcHV0ZS5kcnVnLnRhcmdldC5iZW5jaD1GQUxTRSwgdXNlLnN1YnNldHRlZC5wZXJ0ID0gVFJVRSlcbn0pXG5gYGAifQ== -->
-<pre class="r"><code>g &lt;- profvis({
-    integrated.all &lt;- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
-        use.imaging=FALSE, use.luminex=FALSE, 
-         sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
-        lincs.meta=lincs.meta,
-         atc.benchmark.name=&quot;chembl-new&quot;, compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
-         use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir=&quot;Output/auc_p_flex&quot;, pert.new=FALSE, common.drugs=NULL,
-        compute.drug.target.bench=FALSE, use.subsetted.pert = TRUE)
-})</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubG9vLm5ldHdvcmtzIDwtIENyZWF0ZUxlYXZlT25lT3V0TmV0d29ya3MoaW50ZWdyYXRlZCwgY29ycmVsYXRpb24ubWF0cmljZXMsIGFsbC5kcnVncywgZGF0YS5iZW5jaClcblxuYGBgIn0= -->
+<pre class="r"><code>loo.networks &lt;- CreateLeaveOneOutNetworks(integrated, correlation.matrices, all.drugs, data.bench)
+</code></pre>
 <!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NVxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG4ifQ== -->
-<pre><code>[1] 365
-[1] &quot;Integration done&quot;</code></pre>
+<!-- rnb-output-begin eyJkYXRhIjoiY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAyNiAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAyNSAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAyNCAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAyMyAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAyMiAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAyMSAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAyMCAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAxOSAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAxOCAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAxNyAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAxNiAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAxNSAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAxNCAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAxMyAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAxMiAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpY2xvc2luZyB1bnVzZWQgY29ubmVjdGlvbiAxMSAoPC1ERVNLVE9QLU43TFVMNDc6MTE1MTEpXG4ifQ== -->
+<pre><code>closing unused connection 26 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 25 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 24 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 23 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 22 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 21 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 20 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 19 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 18 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 17 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 16 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 15 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 14 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 13 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 12 (&lt;-DESKTOP-N7LUL47:11511)closing unused connection 11 (&lt;-DESKTOP-N7LUL47:11511)</code></pre>
 <!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
+<p>Now we evaluate the KNN performance for each leave-one-out network on a drug by drug basis.</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYWNjdXJhY2llcyA8LSBudW1lcmljKGxlbmd0aCh1bmlxdWUoZGF0YS5iZW5jaCRNT0xFQ1VMRV9OQU1FKSkpXG5uYW1lcyhhY2N1cmFjaWVzKSA8LSB1bmlxdWUoZGF0YS5iZW5jaCRNT0xFQ1VMRV9OQU1FKVxuayA8LSA3XG5mb3IgKGRydWcgaW4gdW5pcXVlKGRhdGEuYmVuY2gkTU9MRUNVTEVfTkFNRSkpIHtcbiAgICBjb21tb24uZHJ1Z3Mub25lLm91dCA8LSBzZXRkaWZmKGNvbW1vbi5kcnVncywgZHJ1ZylcbiAgICBcbiAgICBuZXQuMSA8LSBFdmFsdWF0ZU1vZGVsUk9DKHVzZS5zZW5zaXRpdml0eT1UUlVFLCB1c2UucGVydHVyYmF0aW9uPVRSVUUsIHVzZS5zdHJ1Y3R1cmU9VFJVRSxcbiAgICAgICAgICAgIHVzZS5pbWFnaW5nPUZBTFNFLCB1c2UubHVtaW5leD1GQUxTRSwgXG4gICAgICAgICAgICAgc2Vuc2l0aXZpdHkuZmlsZS5uYW1lPXNlbnNpdGl2aXR5LmZpbGUubmFtZSwgcGVydC5maWxlLm5hbWU9cGVydC5maWxlLm5hbWUsIFxuICAgICAgICAgICAgbGluY3MubWV0YT1saW5jcy5tZXRhLFxuICAgICAgICAgICAgIGF0Yy5iZW5jaG1hcmsubmFtZT1cImNoZW1ibC1uZXdcIiwgY29tcHV0ZS5hdGM9RkFMU0UsIHVzZS5jdHJwdjI9VFJVRSwgdXNlLmNsdWU9RkFMU0UsXG4gICAgICAgICAgICAgdXNlLmNoZW1ibD1GQUxTRSwgdXNlLmRiYW5rPUZBTFNFLCB1c2UuZHRjPUZBTFNFLCBjcmVhdGUuY29tbXVuaXRpZXM9RkFMU0UsIGJhc2UuZGlyPVwiT3V0cHV0L2F1Y19wX2ZsZXhcIiwgcGVydC5uZXc9RkFMU0UsIGNvbW1vbi5kcnVncz1jb21tb24uZHJ1Z3Mub25lLm91dCxcbiAgICAgICAgICAgIGNvbXB1dGUuZHJ1Zy50YXJnZXQuYmVuY2g9RkFMU0UsIHVzZS5zdWJzZXR0ZWQucGVydCA9IFRSVUUpJGludGVncmF0ZWRcbiAgICBcbiAgICBuZXQuMiA8LSBpbnRlZ3JhdGVkLmFsbFxuICAgIG5ldC4yW3Jvd25hbWVzKG5ldC4xKSwgY29sbmFtZXMobmV0LjEpXSA8LSBuZXQuMVxuICAgIFxuICAgIGFjY3VyYWNpZXNbZHJ1Z10gPC0gR2V0S05OQWNjdXJhY3koaywgbmV0LjIsIGRhdGEuYmVuY2gpW2RydWddXG4gICAgcHJpbnQoZHJ1Zylcbn1cbmBgYCJ9 -->
-<pre class="r"><code>accuracies &lt;- numeric(length(unique(data.bench$MOLECULE_NAME)))
-names(accuracies) &lt;- unique(data.bench$MOLECULE_NAME)
-k &lt;- 7
-for (drug in unique(data.bench$MOLECULE_NAME)) {
-    common.drugs.one.out &lt;- setdiff(common.drugs, drug)
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubnVtLm5laWdoYm91cnMgPC0gMTozMFxuYzEgPC0gbWFrZUNsdXN0ZXIoOCwgb3V0ZmlsZT1cIlwiKVxucmVnaXN0ZXJEb1BhcmFsbGVsKGMxKVxuYWNjdXJhY2llcyA8LSBmb3JlYWNoKGs9bnVtLm5laWdoYm91cnMsIC5wYWNrYWdlcz1jKFwiTWF0cml4Q29ycmVsYXRpb25cIiwgXCJmb3JlYWNoXCIpKSAlZG9wYXIlIHtcbiAgICBmb3JlYWNoKGRydWc9dW5pcXVlKGRhdGEuYmVuY2gkTU9MRUNVTEVfTkFNRSksIC5jb21iaW5lPVwiY1wiLCAucGFja2FnZXM9YyhcIk1hdHJpeENvcnJlbGF0aW9uXCIsIFwiZm9yZWFjaFwiKSkgJWRvJSB7XG4gICAgICAgIG5ldC4yIDwtIGxvby5uZXR3b3Jrc1tbZHJ1Z11dXG4gICAgICAgIGFjYyA8LSBHZXRLTk5BY2N1cmFjeVNpbmdsZShrLCBuZXQuMiwgZGF0YS5iZW5jaCwgZHJ1Zywgc2NhbGUuZGlzdGFuY2U9RilcbiAgICAgICAgbmFtZXMoYWNjKSA8LSBkcnVnXG4gICAgICAgIFxuICAgICAgICBhY2NcbiAgICB9XG59XG5uYW1lcyhhY2N1cmFjaWVzKSA8LSBhcy5jaGFyYWN0ZXIobnVtLm5laWdoYm91cnMpXG5zdG9wQ2x1c3RlcihjMSlcbmBgYCJ9 -->
+<pre class="r"><code>num.neighbours &lt;- 1:30
+c1 &lt;- makeCluster(8, outfile=&quot;&quot;)
+registerDoParallel(c1)
+accuracies &lt;- foreach(k=num.neighbours, .packages=c(&quot;MatrixCorrelation&quot;, &quot;foreach&quot;)) %dopar% {
+    foreach(drug=unique(data.bench$MOLECULE_NAME), .combine=&quot;c&quot;, .packages=c(&quot;MatrixCorrelation&quot;, &quot;foreach&quot;)) %do% {
+        net.2 &lt;- loo.networks[[drug]]
+        acc &lt;- GetKNNAccuracySingle(k, net.2, data.bench, drug, scale.distance=F)
+        names(acc) &lt;- drug
+        
+        acc
+    }
+}
+names(accuracies) &lt;- as.character(num.neighbours)
+stopCluster(c1)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>Finally, we output the accuracies and determine the optimal value of k</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZm9yIChrIGluIGFzLmNoYXJhY3RlcihudW0ubmVpZ2hib3VycykpIHtcbiAgICBhY2N1cmFjeSA8LSBzdW0oYWNjdXJhY2llc1tba11dKSAvIGxlbmd0aChhY2N1cmFjaWVzW1trXV0pXG4gICAgXG4gICAgY2F0KHBhc3RlKFwiaz1cIiwgaywgXCIgYWNjdXJhY3k6XCIsIGFjY3VyYWN5LCBcIlxcblwiLCBzZXA9XCJcIikpXG59XG5gYGAifQ== -->
+<pre class="r"><code>for (k in as.character(num.neighbours)) {
+    accuracy &lt;- sum(accuracies[[k]]) / length(accuracies[[k]])
     
-    net.1 &lt;- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
-            use.imaging=FALSE, use.luminex=FALSE, 
-             sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
-            lincs.meta=lincs.meta,
-             atc.benchmark.name=&quot;chembl-new&quot;, compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
-             use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir=&quot;Output/auc_p_flex&quot;, pert.new=FALSE, common.drugs=common.drugs.one.out,
-            compute.drug.target.bench=FALSE, use.subsetted.pert = TRUE)$integrated
-    
-    net.2 &lt;- integrated.all
-    net.2[rownames(net.1), colnames(net.1)] &lt;- net.1
-    
-    accuracies[drug] &lt;- GetKNNAccuracy(k, net.2, data.bench)[drug]
-    print(drug)
+    cat(paste(&quot;k=&quot;, k, &quot; accuracy:&quot;, accuracy, &quot;\n&quot;, sep=&quot;&quot;))
 }</code></pre>
 <!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJaRUJVTEFSSU5FXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;ZEBULARINE&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBWkFDSVRJRElORVwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;AZACITIDINE&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJJU09OSUNPVElOT0hZRFJPWEFNSUNBQ0lEXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;ISONICOTINOHYDROXAMICACID&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCUklWQU5JQlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BRIVANIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUQU1PWElGRU5cIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TAMOXIFEN&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBTTU4MFwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;AM580&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJDRDE1MzBcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;CD1530&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTQUxFUk1JREVcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SALERMIDE&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCSUJSMTUzMlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BIBR1532&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTT1JBRkVOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SORAFENIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJFWDUyN1wiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;EX527&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUQU5EVVRJTklCXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TANDUTINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJMRTEzNVwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;LE135&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTQjQzMTU0MlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SB431542&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJPU0k5MzBcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;OSI930&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJDRDQzN1wiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;CD437&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJHRU1DSVRBQklORVwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;GEMCITABINE&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTTjM4XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SN38&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUT1BPVEVDQU5cIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TOPOTECAN&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCQVJBU0VSVElCXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BARASERTIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBTElTRVJUSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;ALISERTIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJET1hPUlVCSUNJTlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;DOXORUBICIN&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJURU5JUE9TSURFXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TENIPOSIDE&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJFVE9QT1NJREVcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;ETOPOSIDE&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJSVVhPTElUSU5JQlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;RUXOLITINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUUENBMVwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TPCA1&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTVTExMjc0XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SU11274&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTVU5JVElOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SUNITINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJQQVpPUEFOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;PAZOPANIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUSVZPWkFOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TIVOZANIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBWElUSU5JQlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;AXITINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJLSTg3NTFcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;KI8751&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJDRURJUkFOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;CEDIRANIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJNR0NEMjY1XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;MGCD265&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJGT1JFVElOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;FORETINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJOSU5URURBTklCXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;NINTEDANIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJLVTAwNjA2NDhcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;KU0060648&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJNSzIyMDZcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;MK2206&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJHREMwOTQxXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;GDC0941&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJaU1RLNDc0XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;ZSTK474&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJHU0sxMDU5NjE1XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;GSK1059615&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJOVlBCRVoyMzVcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;NVPBEZ235&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJURU1TSVJPTElNVVNcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TEMSIROLIMUS&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTSVJPTElNVVNcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SIROLIMUS&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJPU0kwMjdcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;OSI027&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJLVTAwNjM3OTRcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;KU0063794&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBWkQ4MDU1XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;AZD8055&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJDUklaT1RJTklCXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;CRIZOTINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJURzEwMTM0OFwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TG101348&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBVDc4NjdcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;AT7867&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJOVlBUQUU2ODRcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;NVPTAE684&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCTVM3NTQ4MDdcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BMS754807&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCTVM1MzY5MjRcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BMS536924&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJMSU5TSVRJTklCXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;LINSITINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJPTEFQQVJJQlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;OLAPARIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJQSTEwM1wiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;PI103&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJOVVRMSU4zXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;NUTLIN3&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJITEkzNzNcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;HLI373&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTRVJERU1FVEFOXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SERDEMETAN&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJNQU5VTVlDSU5BXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;MANUMYCINA&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJQUklNQTFcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;PRIMA1&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBWkQxNDgwXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;AZD1480&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJSSVRBXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;RITA&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBQlQ3MzdcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;ABT737&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJOQVZJVE9DTEFYXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;NAVITOCLAX&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCSVgwMTI5NFwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BIX01294&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJQUk9DSExPUlBFUkFaSU5FXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;PROCHLORPERAZINE&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUUklGTFVPUEVSQVpJTkVcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TRIFLUOPERAZINE&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJOSUxPVElOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;NILOTINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJNQVNJVElOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;MASITINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJJTUFUSU5JQlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;IMATINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJLVTU1OTMzXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;KU55933&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJLVTYwMDE5XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;KU60019&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUQUNFRElOQUxJTkVcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TACEDINALINE&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCRUxJTk9TVEFUXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BELINOSTAT&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJWT1JJTk9TVEFUXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;VORINOSTAT&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBUElDSURJTlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;APICIDIN&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJJU09YXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;ISOX&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJFTlRJTk9TVEFUXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;ENTINOSTAT&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJNRVJDSzYwXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;MERCK60&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJDSUNMT1BJUk9YXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;CICLOPIROX&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJPQkFUT0NMQVhcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;OBATOCLAX&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJWRUxJUEFSSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;VELIPARIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJURzEwMDExNVwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TG100115&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBWkQ2NDgyXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;AZD6482&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUR1gyMjFcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TGX221&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTQVJBQ0FUSU5JQlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SARACATINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJEQVNBVElOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;DASATINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJXWjQwMDJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;WZ4002&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCT1NVVElOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BOSUTINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJHRUZJVElOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;GEFITINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJFUkxPVElOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;ERLOTINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJDQU5FUlRJTklCXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;CANERTINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJMQVBBVElOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;LAPATINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBRkFUSU5JQlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;AFATINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJORVJBVElOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;NERATINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJWRVIxNTUwMDhcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;VER155008&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJVTkMwMzIxXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;UNC0321&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUUkVUSU5PSU5cIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TRETINOIN&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBR0syXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;AGK2&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUUkFNRVRJTklCXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TRAMETINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTRUxVTUVUSU5JQlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SELUMETINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJQUklNQTFNRVRcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;PRIMA1MET&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTR1g1MjNcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SGX523&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJRVUlaQVJUSU5JQlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;QUIZARTINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTUlQxNzIwXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SRT1720&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUSVBJRkFSTklCUDJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TIPIFARNIBP2&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBQzU1NjQ5XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;AC55649&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUVUJBU1RBVElOQVwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TUBASTATINA&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJSRzEwOFwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;RG108&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJHTVgxNzc4XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;GMX1778&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJDQVkxMDYxOFwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;CAY10618&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJGTFVPUk9VUkFDSUxcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;FLUOROURACIL&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJERUNJVEFCSU5FXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;DECITABINE&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJQSEE3OTM4ODdcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;PHA793887&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCTVMzNDU1NDFcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BMS345541&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJBTFZPQ0lESUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;ALVOCIDIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJMSU5JRkFOSUJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;LINIFANIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJHVzg0MzY4MlhcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;GW843682X&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJMWTIxODMyNDBcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;LY2183240&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCSTI1MzZcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BI2536&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJHU0s0NjEzNjRcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;GSK461364&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUSVZBTlRJTklCXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TIVANTINIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJNRzEzMlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;MG132&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJNTE4yMjM4XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;MLN2238&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCT1JURVpPTUlCXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BORTEZOMIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTSjE3MjU1MFwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SJ172550&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJGTFVWQVNUQVRJTlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;FLUVASTATIN&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJMT1ZBU1RBVElOXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;LOVASTATIN&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTSU1WQVNUQVRJTlwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SIMVASTATIN&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJHREMwODc5XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;GDC0879&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJEQUJSQUZFTklCXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;DABRAFENIB&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJQTFg0NzIwXCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;PLX4720&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJCUkRLODg3NDIxMTBcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;BRDK88742110&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJGVUxWRVNUUkFOVFwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;FULVESTRANT&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJQSUZJVEhSSU5NVVwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;PIFITHRINMU&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJTQjUyNTMzNFwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;SB525334&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJQRjc1MFwiXG5bMV0gOTc4IDQ2NlxuIn0= -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;PF750&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJNU1QzMTJcIlxuWzFdIDk3OCA0NjZcbiJ9 -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;MST312&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJUVzM3XCJcblsxXSA5NzggNDY2XG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;TW37&quot;
-[1] 978 466</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnaXMubmEoKSBhcHBsaWVkIHRvIG5vbi0obGlzdCBvciB2ZWN0b3IpIG9mIHR5cGUgJ05VTEwnXG4ifQ== -->
-<pre><code>is.na() applied to non-(list or vector) of type 'NULL'is.na() applied to non-(list or vector) of type 'NULL'</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDM2NFxuWzFdIFwiSW50ZWdyYXRpb24gZG9uZVwiXG5bMV0gXCJHT1NTWVBPTFwiXG4ifQ== -->
-<pre><code>[1] 364
-[1] &quot;Integration done&quot;
-[1] &quot;GOSSYPOL&quot;</code></pre>
-<!-- rnb-output-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiaz0xIGFjY3VyYWN5OjAuNjUyNDgyMjY5NTAzNTQ2XG5rPTIgYWNjdXJhY3k6MC43MjM0MDQyNTUzMTkxNDlcbms9MyBhY2N1cmFjeTowLjc2NTk1NzQ0NjgwODUxMVxuaz00IGFjY3VyYWN5OjAuNzgwMTQxODQzOTcxNjMxXG5rPTUgYWNjdXJhY3k6MC43ODcyMzQwNDI1NTMxOTJcbms9NiBhY2N1cmFjeTowLjc3MzA0OTY0NTM5MDA3MVxuaz03IGFjY3VyYWN5OjAuNzczMDQ5NjQ1MzkwMDcxXG5rPTggYWNjdXJhY3k6MC43NzMwNDk2NDUzOTAwNzFcbms9OSBhY2N1cmFjeTowLjc3MzA0OTY0NTM5MDA3MVxuaz0xMCBhY2N1cmFjeTowLjc3MzA0OTY0NTM5MDA3MVxuaz0xMSBhY2N1cmFjeTowLjc3MzA0OTY0NTM5MDA3MVxuaz0xMiBhY2N1cmFjeTowLjc1ODg2NTI0ODIyNjk1XG5rPTEzIGFjY3VyYWN5OjAuNzIzNDA0MjU1MzE5MTQ5XG5rPTE0IGFjY3VyYWN5OjAuNzA5MjE5ODU4MTU2MDI4XG5rPTE1IGFjY3VyYWN5OjAuNzE2MzEyMDU2NzM3NTg5XG5rPTE2IGFjY3VyYWN5OjAuNzA5MjE5ODU4MTU2MDI4XG5rPTE3IGFjY3VyYWN5OjAuNjk1MDM1NDYwOTkyOTA4XG5rPTE4IGFjY3VyYWN5OjAuNjgwODUxMDYzODI5Nzg3XG5rPTE5IGFjY3VyYWN5OjAuNjU5NTc0NDY4MDg1MTA2XG5rPTIwIGFjY3VyYWN5OjAuNjUyNDgyMjY5NTAzNTQ2XG5rPTIxIGFjY3VyYWN5OjAuNjMxMjA1NjczNzU4ODY1XG5rPTIyIGFjY3VyYWN5OjAuNjMxMjA1NjczNzU4ODY1XG5rPTIzIGFjY3VyYWN5OjAuNjA5OTI5MDc4MDE0MTg0XG5rPTI0IGFjY3VyYWN5OjAuNjE3MDIxMjc2NTk1NzQ1XG5rPTI1IGFjY3VyYWN5OjAuNjAyODM2ODc5NDMyNjI0XG5rPTI2IGFjY3VyYWN5OjAuNjA5OTI5MDc4MDE0MTg0XG5rPTI3IGFjY3VyYWN5OjAuNjAyODM2ODc5NDMyNjI0XG5rPTI4IGFjY3VyYWN5OjAuNjAyODM2ODc5NDMyNjI0XG5rPTI5IGFjY3VyYWN5OjAuNTk1NzQ0NjgwODUxMDY0XG5rPTMwIGFjY3VyYWN5OjAuNTgxNTYwMjgzNjg3OTQzXG4ifQ== -->
+<pre><code>k=1 accuracy:0.652482269503546
+k=2 accuracy:0.723404255319149
+k=3 accuracy:0.765957446808511
+k=4 accuracy:0.780141843971631
+k=5 accuracy:0.787234042553192
+k=6 accuracy:0.773049645390071
+k=7 accuracy:0.773049645390071
+k=8 accuracy:0.773049645390071
+k=9 accuracy:0.773049645390071
+k=10 accuracy:0.773049645390071
+k=11 accuracy:0.773049645390071
+k=12 accuracy:0.75886524822695
+k=13 accuracy:0.723404255319149
+k=14 accuracy:0.709219858156028
+k=15 accuracy:0.716312056737589
+k=16 accuracy:0.709219858156028
+k=17 accuracy:0.695035460992908
+k=18 accuracy:0.680851063829787
+k=19 accuracy:0.659574468085106
+k=20 accuracy:0.652482269503546
+k=21 accuracy:0.631205673758865
+k=22 accuracy:0.631205673758865
+k=23 accuracy:0.609929078014184
+k=24 accuracy:0.617021276595745
+k=25 accuracy:0.602836879432624
+k=26 accuracy:0.609929078014184
+k=27 accuracy:0.602836879432624
+k=28 accuracy:0.602836879432624
+k=29 accuracy:0.595744680851064
+k=30 accuracy:0.581560283687943</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+</div>
+<div id="using-combined-drug-target-dataset" class="section level2">
+<h2>Using Combined Drug Target Dataset</h2>
+<div id="integrate-layers-1" class="section level3">
+<h3>Integrate Layers</h3>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYWxsLmRydWdzIDwtIGNvbW1vbi5kcnVnc1xuY29ycmVsYXRpb24ubWF0cmljZXMgPC0gbGlzdChzZW5zPXNlbnMuY29yLCBwZXJ0PXBlcnQuY29yLCBzdHJjPXN0cmMuY29yKVxuaW50ZWdyYXRlZCA8LSBJbnRlZ3JhdGVDb3JyZWxhdGlvbk1hdHJpY2VzKGNvcnJlbGF0aW9uLm1hdHJpY2VzLCBhbGwuZHJ1Z3MpXG5gYGAifQ== -->
+<pre class="r"><code>all.drugs &lt;- common.drugs
+correlation.matrices &lt;- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
+integrated &lt;- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)</code></pre>
+<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3VtKGFjY3VyYWNpZXMpIC8gbGVuZ3RoKGFjY3VyYWNpZXMpXG5gYGAifQ== -->
-<pre class="r"><code>sum(accuracies) / length(accuracies)</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZGF0YS5iZW5jaCA8LSBEcnVnVGFyZ2V0c0tOTihjb21tb24uZHJ1Z3MsIFxuICAgICAgICAgICAgICAgICAgICAgICAgICAgICBnbXQuZmlsZS5uYW1lLCB1c2UuY3RycHYyPVRSVUUsXG4gICAgICAgICAgICAgICAgICAgICAgICAgICAgIHVzZS5jbHVlPVRSVUUsIHVzZS5jaGVtYmw9VFJVRSxcbiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdXNlLmRiYW5rPVRSVUUsIHVzZS5kdGM9RkFMU0UpICMgMTQxIHggMTQxIGRydWctZHJ1ZyBhZGphY2VuY3kgbWF0cml4IC0tPiAxNDFcbmRhdGEuYmVuY2hbXSA8LSBsYXBwbHkoZGF0YS5iZW5jaCwgYXMuY2hhcmFjdGVyKVxuYGBgIn0= -->
+<pre class="r"><code>data.bench &lt;- DrugTargetsKNN(common.drugs, 
+                             gmt.file.name, use.ctrpv2=TRUE,
+                             use.clue=TRUE, use.chembl=TRUE,
+                             use.dbank=TRUE, use.dtc=FALSE) # 141 x 141 drug-drug adjacency matrix --&gt; 141
+data.bench[] &lt;- lapply(data.bench, as.character)</code></pre>
 <!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDAuNzMwNDk2NVxuIn0= -->
-<pre><code>[1] 0.7304965</code></pre>
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubG9vLm5ldHdvcmtzIDwtIENyZWF0ZUxlYXZlT25lT3V0TmV0d29ya3MoaW50ZWdyYXRlZCwgY29ycmVsYXRpb24ubWF0cmljZXMsIGFsbC5kcnVncywgZGF0YS5iZW5jaClcbmBgYCJ9 -->
+<pre class="r"><code>loo.networks &lt;- CreateLeaveOneOutNetworks(integrated, correlation.matrices, all.drugs, data.bench)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>Now we evaluate the KNN performance for each leave-one-out network on a drug by drug basis.</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubnVtLm5laWdoYm91cnMgPC0gMTozMFxuYzEgPC0gbWFrZUNsdXN0ZXIoOCwgb3V0ZmlsZT1cIlwiKVxucmVnaXN0ZXJEb1BhcmFsbGVsKGMxKVxuYWNjdXJhY2llcyA8LSBmb3JlYWNoKGs9bnVtLm5laWdoYm91cnMsIC5wYWNrYWdlcz1jKFwiTWF0cml4Q29ycmVsYXRpb25cIiwgXCJmb3JlYWNoXCIpKSAlZG9wYXIlIHtcbiAgICBmb3JlYWNoKGRydWc9dW5pcXVlKGRhdGEuYmVuY2gkTU9MRUNVTEVfTkFNRSksIC5jb21iaW5lPVwiY1wiLCAucGFja2FnZXM9YyhcIk1hdHJpeENvcnJlbGF0aW9uXCIsIFwiZm9yZWFjaFwiKSkgJWRvJSB7XG4gICAgICAgIG5ldC4yIDwtIGxvby5uZXR3b3Jrc1tbZHJ1Z11dXG4gICAgICAgIGFjYyA8LSBHZXRLTk5BY2N1cmFjeVNpbmdsZShrLCBuZXQuMiwgZGF0YS5iZW5jaCwgZHJ1Zywgc2NhbGUuZGlzdGFuY2U9RilcbiAgICAgICAgbmFtZXMoYWNjKSA8LSBkcnVnXG4gICAgICAgIFxuICAgICAgICBhY2NcbiAgICB9XG59XG5uYW1lcyhhY2N1cmFjaWVzKSA8LSBhcy5jaGFyYWN0ZXIobnVtLm5laWdoYm91cnMpXG5zdG9wQ2x1c3RlcihjMSlcbmBgYCJ9 -->
+<pre class="r"><code>num.neighbours &lt;- 1:30
+c1 &lt;- makeCluster(8, outfile=&quot;&quot;)
+registerDoParallel(c1)
+accuracies &lt;- foreach(k=num.neighbours, .packages=c(&quot;MatrixCorrelation&quot;, &quot;foreach&quot;)) %dopar% {
+    foreach(drug=unique(data.bench$MOLECULE_NAME), .combine=&quot;c&quot;, .packages=c(&quot;MatrixCorrelation&quot;, &quot;foreach&quot;)) %do% {
+        net.2 &lt;- loo.networks[[drug]]
+        acc &lt;- GetKNNAccuracySingle(k, net.2, data.bench, drug, scale.distance=F)
+        names(acc) &lt;- drug
+        
+        acc
+    }
+}
+names(accuracies) &lt;- as.character(num.neighbours)
+stopCluster(c1)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>Finally, we output the accuracies and determine the optimal value of k</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZm9yIChrIGluIGFzLmNoYXJhY3RlcihudW0ubmVpZ2hib3VycykpIHtcbiAgICBhY2N1cmFjeSA8LSBzdW0oYWNjdXJhY2llc1tba11dKSAvIGxlbmd0aChhY2N1cmFjaWVzW1trXV0pXG4gICAgXG4gICAgY2F0KHBhc3RlKFwiaz1cIiwgaywgXCIgYWNjdXJhY3k6XCIsIGFjY3VyYWN5LCBcIlxcblwiLCBzZXA9XCJcIikpXG59XG5gYGAifQ== -->
+<pre class="r"><code>for (k in as.character(num.neighbours)) {
+    accuracy &lt;- sum(accuracies[[k]]) / length(accuracies[[k]])
+    
+    cat(paste(&quot;k=&quot;, k, &quot; accuracy:&quot;, accuracy, &quot;\n&quot;, sep=&quot;&quot;))
+}</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiaz0xIGFjY3VyYWN5OjAuNDk4MDA3OTY4MTI3NDlcbms9MiBhY2N1cmFjeTowLjU0NTgxNjczMzA2NzcyOVxuaz0zIGFjY3VyYWN5OjAuNTYxNzUyOTg4MDQ3ODA5XG5rPTQgYWNjdXJhY3k6MC41ODE2NzMzMDY3NzI5MDhcbms9NSBhY2N1cmFjeTowLjYwMTU5MzYyNTQ5ODAwOFxuaz02IGFjY3VyYWN5OjAuNjAxNTkzNjI1NDk4MDA4XG5rPTcgYWNjdXJhY3k6MC41OTc2MDk1NjE3NTI5ODhcbms9OCBhY2N1cmFjeTowLjU5NzYwOTU2MTc1Mjk4OFxuaz05IGFjY3VyYWN5OjAuNTc3Njg5MjQzMDI3ODg4XG5rPTEwIGFjY3VyYWN5OjAuNTgxNjczMzA2NzcyOTA4XG5rPTExIGFjY3VyYWN5OjAuNTc3Njg5MjQzMDI3ODg4XG5rPTEyIGFjY3VyYWN5OjAuNTY1NzM3MDUxNzkyODI5XG5rPTEzIGFjY3VyYWN5OjAuNTczNzA1MTc5MjgyODY5XG5rPTE0IGFjY3VyYWN5OjAuNTU3NzY4OTI0MzAyNzg5XG5rPTE1IGFjY3VyYWN5OjAuNTQ5ODAwNzk2ODEyNzQ5XG5rPTE2IGFjY3VyYWN5OjAuNTQ1ODE2NzMzMDY3NzI5XG5rPTE3IGFjY3VyYWN5OjAuNTI5ODgwNDc4MDg3NjQ5XG5rPTE4IGFjY3VyYWN5OjAuNTMzODY0NTQxODMyNjY5XG5rPTE5IGFjY3VyYWN5OjAuNTMzODY0NTQxODMyNjY5XG5rPTIwIGFjY3VyYWN5OjAuNTM3ODQ4NjA1NTc3Njg5XG5rPTIxIGFjY3VyYWN5OjAuNTQ1ODE2NzMzMDY3NzI5XG5rPTIyIGFjY3VyYWN5OjAuNTQ1ODE2NzMzMDY3NzI5XG5rPTIzIGFjY3VyYWN5OjAuNTQ1ODE2NzMzMDY3NzI5XG5rPTI0IGFjY3VyYWN5OjAuNTM3ODQ4NjA1NTc3Njg5XG5rPTI1IGFjY3VyYWN5OjAuNTM3ODQ4NjA1NTc3Njg5XG5rPTI2IGFjY3VyYWN5OjAuNTMzODY0NTQxODMyNjY5XG5rPTI3IGFjY3VyYWN5OjAuNTQxODMyNjY5MzIyNzA5XG5rPTI4IGFjY3VyYWN5OjAuNTM3ODQ4NjA1NTc3Njg5XG5rPTI5IGFjY3VyYWN5OjAuNTI5ODgwNDc4MDg3NjQ5XG5rPTMwIGFjY3VyYWN5OjAuNTI5ODgwNDc4MDg3NjQ5XG4ifQ== -->
+<pre><code>k=1 accuracy:0.49800796812749
+k=2 accuracy:0.545816733067729
+k=3 accuracy:0.561752988047809
+k=4 accuracy:0.581673306772908
+k=5 accuracy:0.601593625498008
+k=6 accuracy:0.601593625498008
+k=7 accuracy:0.597609561752988
+k=8 accuracy:0.597609561752988
+k=9 accuracy:0.577689243027888
+k=10 accuracy:0.581673306772908
+k=11 accuracy:0.577689243027888
+k=12 accuracy:0.565737051792829
+k=13 accuracy:0.573705179282869
+k=14 accuracy:0.557768924302789
+k=15 accuracy:0.549800796812749
+k=16 accuracy:0.545816733067729
+k=17 accuracy:0.529880478087649
+k=18 accuracy:0.533864541832669
+k=19 accuracy:0.533864541832669
+k=20 accuracy:0.537848605577689
+k=21 accuracy:0.545816733067729
+k=22 accuracy:0.545816733067729
+k=23 accuracy:0.545816733067729
+k=24 accuracy:0.537848605577689
+k=25 accuracy:0.537848605577689
+k=26 accuracy:0.533864541832669
+k=27 accuracy:0.541832669322709
+k=28 accuracy:0.537848605577689
+k=29 accuracy:0.529880478087649
+k=30 accuracy:0.529880478087649</code></pre>
 <!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
@@ -1563,7 +488,7 @@ for (drug in unique(data.bench$MOLECULE_NAME)) {
 </div>
 </div>
 
-<div id="rmd-source-code">LS0tDQp0aXRsZTogIktOTiBDcm9zcyBWYWxpZGF0aW9uIg0Kb3V0cHV0OiBodG1sX25vdGVib29rDQotLS0NCg0KIyMgQ3Jvc3MgVmFsaWRhdGlvbiBFeHBsYW5hdGlvbiBhbmQgUmVhc29uaW5nDQoNCkJlZm9yZSBwcm9jZWVkaW5nLCBsZXQncyByZWNhbGwgaG93IHRoaXMgY3Jvc3MgdmFsaWRhdGlvbiBzaGFsbCBiZSBkb25lLiBXZSBhcmUgZG9pbmcgTE9PQ1YsIHNpbmNlIGstZm9sZHMgaXMgYSBiaXQgZXh0cmVtZS4gQnkgdGhhdCBJIG1lYW4gdGhhdCBsZWF2aW5nIG91dCBzYXkgMTAlIG9mIHRoZSBkcnVncyB3aGVuIGNvbnN0cnVjdGluZyB0aGUgbmV0d29yayBjb3VsZCByZWFsbHkgY2hhbmdlIHRoZSByZXN1bHRpbmcgbmV0d29yaywgd2hpY2ggaXMgbm90IHdoYXQgd2Ugd2FudC4gRnVydGhlcm1vcmUsIHRoaXMgaXMgbm90IGFuIGFjY3VyYXRlIHVzZSBjYXNlIHNpbmNlIGEgdXNlciBtaWdodCB1cGxvYWQgb25lIG9yIHR3byBkcnVncyBhdCBtb3N0LiANCg0KU28sIGxldCdzIGdpdmUgdGhlIHN0ZXBzIGZvciB3aGF0IHRoaXMgYWxnbyBsb29rcyBsaWtlLiBGb3IgYWxsIGRydWdzIHRoYXQgd2UgaGF2ZSB0YXJnZXQgZGF0YSBmb3I6DQoNCjEuIFBpY2sgYSBkcnVnIFggdG8gbGVhdmUgb3V0DQoyLiBDb21wdXRlIHRoZSBpbnRlZ3JhdGVkIG5ldHdvcmsgdXNpbmcgYWxsIGRydWdzIGJ1dCBYLiBDYWxsIHRoaXMgTmV0LjENCjMuIENvbXB1dGUgdGhlIGludGVncmF0ZWQgbmV0d29yayB1c2luZyBhbGwgZHJ1Z3MgaW5jbHVkaW5nIFguIENhbGwgdGhpcyBOZXQuMg0KNC4gT3ZlcndyaXRlIHRoZSB2YWx1ZXMgaW4gTmV0LjIgdXNpbmcgdGhlIHZhbHVlcyBmcm9tIE5ldC4xIGZvciBhbGwgZHJ1Z3MgZXhjZXB0IFgNCjUuIEV2YWx1YXRlIHRoZSB0b3AgNSBhY2N1cmFjeSBvbiBYIHVzaW5nIHRoZSBtb2RpZmllZCBOZXQuMiBmcm9tIHN0ZXAgNA0KDQojIyBQZXJmb3JtYW5jZSBXaXRob3V0IEltcHV0YXRpb24NCg0KDQoNCiMjIyBVc2luZyBjdHJwdjIgdGFyZ2V0cw0KDQpgYGB7ciBzZXR1cH0NCmtuaXRyOjpvcHRzX2tuaXQkc2V0KHJvb3QuZGlyID0gbm9ybWFsaXplUGF0aCgnLi4nKSkNCmdldHdkKCkNCmBgYA0KDQoNCldlIGJlZ2luIGJ5IHJ1bm5pbmcgdGhlIHNjcmlwdCB0aGF0IGNvbXB1dGVzIGF1YyBpbiBvcmRlciB0byBvYnRhaW4gdGhlIGludGVncmF0ZWQgbmV0d29yay4NCg0KSW4gb3JkZXIgdG8gZG8gc28sIHdlIGZpcnN0IGxvYWQgaW4gYWxsIG5lY2Vzc2FyeSBsaWJyYXJpZXMgYW5kIHNjcmlwdHMNCg0KYGBge3IsIG1lc3NhZ2U9RkFMU0UsIHdhcm5pbmc9RkFMU0UsIGVjaG89RkFMU0V9DQpybShsaXN0PWxzKCkpDQoNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL3N0cnVjdHVyZURhdGFGbGV4aWJsZS5SIikNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL3NlbnNpdGl2aXR5RGF0YUZsZXhpYmxlLlIiKQ0Kc291cmNlKCJSQ29kZS9mbGV4aWJsZV9sYXllcnMvcGVydHVyYmF0aW9uRGF0YUZsZXhpYmxlLlIiKQ0Kc291cmNlKCJSQ29kZS9mbGV4aWJsZV9sYXllcnMvcGVydHVyYmF0aW9uRGF0YUZsZXhpYmxlQ3VzdG9tU2lnLlIiKQ0Kc291cmNlKCJSQ29kZS9mbGV4aWJsZV9sYXllcnMvbHVtaW5leERhdGFGbGV4aWJsZS5SIikNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL2ltYWdpbmdEYXRhRmxleGlibGUuUiIpDQoNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL2NvbnN0U2Vuc2l0aXZpdHlMYXllckZsZXhpYmxlLlIiKQ0Kc291cmNlKCJSQ29kZS9mbGV4aWJsZV9sYXllcnMvY29uc3RTdHJ1Y3R1cmVMYXllckZsZXhpYmxlLlIiKQ0Kc291cmNlKCJSQ29kZS9mbGV4aWJsZV9sYXllcnMvY29uc3RMdW1pbmV4TGF5ZXJGbGV4aWJsZS5SIikNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL2NvbnN0SW1hZ2luZ0xheWVyRmxleGlibGUuUiIpDQpzb3VyY2UoIlJDb2RlL2ZsZXhpYmxlX2xheWVycy9jb25zdFBlcnR1cmJhdGlvbkxheWVyRmxleGlibGUuUiIpDQoNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL2ludGVncmF0ZUxheWVyc0ZsZXhpYmxlLlIiKQ0Kc291cmNlKCJSQ29kZS9mbGV4aWJsZV9sYXllcnMvZHJ1Z1RhcmdldEJlbmNoRmxleGlibGUuUiIpDQpzb3VyY2UoIlJDb2RlL2ZsZXhpYmxlX2xheWVycy9zdGFja2VkTGF5ZXJBbmFseXNpc0hlbHBlcnMuUiIpDQoNCnNvdXJjZSgiUkNvZGUvY2luZGV4Q29tcDIuUiIpDQpzb3VyY2UoIlJDb2RlL3ByZWRQZXJmLlIiKQ0KDQpzb3VyY2UoIlJDb2RlL2tubi9rbm5IZWxwZXJzLlIiKQ0Kc291cmNlKCJSQ29kZS9rbm4vZHJ1Z1RhcmdldHNLTk4uUiIpDQoNCmxpYnJhcnkoUGhhcm1hY29HeCkNCmxpYnJhcnkoYXBjbHVzdGVyKQ0KbGlicmFyeShyY2RrKQ0KbGlicmFyeShmaW5nZXJwcmludCkNCmxpYnJhcnkoYW5ub3RhdGUpDQpsaWJyYXJ5KG9yZy5Icy5lZy5kYikNCmxpYnJhcnkoU05GdG9vbCkNCmxpYnJhcnkoUk9DUikNCmxpYnJhcnkoc3VydmNvbXApDQpsaWJyYXJ5KHJlc2hhcGUyKQ0KbGlicmFyeShwcm94eSkNCmxpYnJhcnkoUFJST0MpDQpsaWJyYXJ5KGFwY2x1c3RlcikNCmxpYnJhcnkocHJvZnZpcykNCg0KIyBMb2FkIGxpbmNzIG1ldGFkYXRhIGFuZCBjbGVhbiB0aGUgcGVydF9pbmFtZXMgaW4gaXQNCmJhZGNoYXJzIDwtICJbXHhiNV18W1xuXXxbLF18WztdfFs6XXxbLV18WytdfFsqXXxbJV18WyRdfFsjXXxbe118W31dfFtbXXxbXV18W3xdfFtcXF5dfFsvXXxbXFxdfFsuXXxbX118WyBdIg0KbGluY3MubWV0YSA8LSByZWFkLmNzdigiRGF0YS9MSU5DUy5jc3YiLCBzdHJpbmdzQXNGYWN0b3JzID0gRkFMU0UpDQpsaW5jcy5tZXRhJHBlcnRfaW5hbWUgPC0gdG91cHBlcihsaW5jcy5tZXRhJHBlcnRfaW5hbWUpDQpsaW5jcy5tZXRhJHBlcnRfaW5hbWUgPC0gZ3N1YihiYWRjaGFycywgIiIsIGxpbmNzLm1ldGEkcGVydF9pbmFtZSkNCg0KcGVydC5maWxlLm5hbWUgPC0gIkRhdGEvTDEwMDBfY29tcG91bmRfc2lnbmF0dXJlc19zdWIucmRzIg0Kc2Vuc2l0aXZpdHkuZmlsZS5uYW1lIDwtICJEYXRhL2NvbWJpbmVkX3NlbnNpdGl2aXR5Ly9jb21iaW5lZF9zZW5zX2luYW1lX3JlcGxhY2VkLlJEYXRhIg0Kc291cmNlKCJSQ29kZS9mbGV4aWJsZV9sYXllcnMvc3RhY2tlZExheWVyQW5hbHlzaXMuUiIpDQojICBEcnVncyB0aGF0IGFyZSBjb21tb24gYmV0d2VlbiBuZXcgc2lnbmF0dXJlcyBhbmQgc2VucyBkYXRhLiBUaGlzIGlzIG5lZWRlZCB0byBjb21wYXJlIGFwcGxlcyB3aXRoIGFwcGxlcw0KIyBpbiB0ZXJtcyBoYXZpbmcgYmVuY2htYXJrcyB0aGF0IGluY2x1ZGUgdGhlIHNhbWUgZHJ1Z3MgaW4gdGhlbS4NCmBgYA0KDQpMZXQncyBmaWd1cmUgb3V0IHRoZSBkcnVncyBpbiBjb21tb24gYmV0d2VlbiB0aGUgMyBzdGFuZGFyZCBsYXllcnMgdXNpbmcgdGhlIG9sZCBwZXJ0dXJiYXRpb24gc2lnbmF0dXJlcy4gQnkgZG9pbmcgc28sIHdlIGNhbiByZW1vdmUgYSBkcnVnIG9uZSBhdCBhIHRpbWUuDQoNCmBgYHtyfQ0Kc2Vucy5kYXRhIDwtIHJlYWRSRFMoc2Vuc2l0aXZpdHkuZmlsZS5uYW1lKQ0KY29tbW9uLmRydWdzIDwtIGludGVyc2VjdChjb2xuYW1lcyhzZW5zLmRhdGEpLCBsaW5jcy5tZXRhJHBlcnRfaW5hbWUpDQpgYGANCg0KV2UgZGV0ZXJtaW5lIHRoZSByZWxldmFudCBkcnVnIHRhcmdldHMgZm9yIHRoZSBkcnVncyBjb21tb24gYmV0d2VlbiB0aGUgbGF5ZXJzLiBGb3Igbm93LCB3ZSBmb2N1cyBvbiB0YXJnZXRzIGZyb20gdGhlICBjdHJwdjIgZGF0YXNldC4gDQoNCmBgYHtyfQ0KZGF0YS5iZW5jaCA8LSBEcnVnVGFyZ2V0c0tOTihjb21tb24uZHJ1Z3MsIA0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICBnbXQuZmlsZS5uYW1lLCB1c2UuY3RycHYyPVRSVUUsDQogICAgICAgICAgICAgICAgICAgICAgICAgICAgIHVzZS5jbHVlPUZBTFNFLCB1c2UuY2hlbWJsPUZBTFNFLA0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICB1c2UuZGJhbms9RkFMU0UsIHVzZS5kdGM9RkFMU0UpICMgMTQxIHggMTQxIGRydWctZHJ1ZyBhZGphY2VuY3kgbWF0cml4IC0tPiAxNDENCmRhdGEuYmVuY2hbXSA8LSBsYXBwbHkoZGF0YS5iZW5jaCwgYXMuY2hhcmFjdGVyKQ0KDQpgYGANCg0KTm93IGxldCdzIGxvb3Agb3ZlciBhbGwgdGhlIGRydWdzIGluIGBkYXRhLmJlbmNoYCBhbmQgZXhlY3V0ZSB0aGUgYWxnbyBtZW50aW9uZWQgYXQgdGhlIHRvcCBvZiB0aGlzIG5vdGVib29rLg0KDQpgYGB7cn0NCmcgPC0gcHJvZnZpcyh7DQogICAgaW50ZWdyYXRlZC5hbGwgPC0gRXZhbHVhdGVNb2RlbFJPQyh1c2Uuc2Vuc2l0aXZpdHk9VFJVRSwgdXNlLnBlcnR1cmJhdGlvbj1UUlVFLCB1c2Uuc3RydWN0dXJlPVRSVUUsDQogICAgICAgIHVzZS5pbWFnaW5nPUZBTFNFLCB1c2UubHVtaW5leD1GQUxTRSwgDQogICAgICAgICBzZW5zaXRpdml0eS5maWxlLm5hbWU9c2Vuc2l0aXZpdHkuZmlsZS5uYW1lLCBwZXJ0LmZpbGUubmFtZT1wZXJ0LmZpbGUubmFtZSwgDQogICAgICAgIGxpbmNzLm1ldGE9bGluY3MubWV0YSwNCiAgICAgICAgIGF0Yy5iZW5jaG1hcmsubmFtZT0iY2hlbWJsLW5ldyIsIGNvbXB1dGUuYXRjPUZBTFNFLCB1c2UuY3RycHYyPVRSVUUsIHVzZS5jbHVlPUZBTFNFLA0KICAgICAgICAgdXNlLmNoZW1ibD1GQUxTRSwgdXNlLmRiYW5rPUZBTFNFLCB1c2UuZHRjPUZBTFNFLCBjcmVhdGUuY29tbXVuaXRpZXM9RkFMU0UsIGJhc2UuZGlyPSJPdXRwdXQvYXVjX3BfZmxleCIsIHBlcnQubmV3PUZBTFNFLCBjb21tb24uZHJ1Z3M9TlVMTCwNCiAgICAgICAgY29tcHV0ZS5kcnVnLnRhcmdldC5iZW5jaD1GQUxTRSwgdXNlLnN1YnNldHRlZC5wZXJ0ID0gVFJVRSkNCn0pDQppbnRlZ3JhdGVkLmFsbCA8LSBpbnRlZ3JhdGVkLmFsbCRpbnRlZ3JhdGVkDQpgYGANCg0KDQpgYGB7cn0NCmFjY3VyYWNpZXMgPC0gbnVtZXJpYyhsZW5ndGgodW5pcXVlKGRhdGEuYmVuY2gkTU9MRUNVTEVfTkFNRSkpKQ0KbmFtZXMoYWNjdXJhY2llcykgPC0gdW5pcXVlKGRhdGEuYmVuY2gkTU9MRUNVTEVfTkFNRSkNCmsgPC0gNw0KDQpmb3IgKGRydWcgaW4gdW5pcXVlKGRhdGEuYmVuY2gkTU9MRUNVTEVfTkFNRSkpIHsNCiAgICBjb21tb24uZHJ1Z3Mub25lLm91dCA8LSBzZXRkaWZmKGNvbW1vbi5kcnVncywgZHJ1ZykNCiAgICANCiAgICBuZXQuMSA8LSBFdmFsdWF0ZU1vZGVsUk9DKHVzZS5zZW5zaXRpdml0eT1UUlVFLCB1c2UucGVydHVyYmF0aW9uPVRSVUUsIHVzZS5zdHJ1Y3R1cmU9VFJVRSwNCiAgICAgICAgICAgIHVzZS5pbWFnaW5nPUZBTFNFLCB1c2UubHVtaW5leD1GQUxTRSwgDQogICAgICAgICAgICAgc2Vuc2l0aXZpdHkuZmlsZS5uYW1lPXNlbnNpdGl2aXR5LmZpbGUubmFtZSwgcGVydC5maWxlLm5hbWU9cGVydC5maWxlLm5hbWUsIA0KICAgICAgICAgICAgbGluY3MubWV0YT1saW5jcy5tZXRhLA0KICAgICAgICAgICAgIGF0Yy5iZW5jaG1hcmsubmFtZT0iY2hlbWJsLW5ldyIsIGNvbXB1dGUuYXRjPUZBTFNFLCB1c2UuY3RycHYyPVRSVUUsIHVzZS5jbHVlPUZBTFNFLA0KICAgICAgICAgICAgIHVzZS5jaGVtYmw9RkFMU0UsIHVzZS5kYmFuaz1GQUxTRSwgdXNlLmR0Yz1GQUxTRSwgY3JlYXRlLmNvbW11bml0aWVzPUZBTFNFLCBiYXNlLmRpcj0iT3V0cHV0L2F1Y19wX2ZsZXgiLCBwZXJ0Lm5ldz1GQUxTRSwgY29tbW9uLmRydWdzPWNvbW1vbi5kcnVncy5vbmUub3V0LA0KICAgICAgICAgICAgY29tcHV0ZS5kcnVnLnRhcmdldC5iZW5jaD1GQUxTRSwgdXNlLnN1YnNldHRlZC5wZXJ0ID0gVFJVRSkkaW50ZWdyYXRlZA0KICAgIA0KICAgIG5ldC4yIDwtIGludGVncmF0ZWQuYWxsDQogICAgbmV0LjJbcm93bmFtZXMobmV0LjEpLCBjb2xuYW1lcyhuZXQuMSldIDwtIG5ldC4xDQogICAgDQogICAgYWNjdXJhY2llc1tkcnVnXSA8LSAgR2V0S05OQWNjdXJhY3koaywgbmV0LjIsIGRhdGEuYmVuY2gpW2RydWddDQogICAgcHJpbnQoZHJ1ZykNCn0NCmBgYA0KDQoNCmBgYHtyfQ0Kc3VtKGFjY3VyYWNpZXMpIC8gbGVuZ3RoKGFjY3VyYWNpZXMpDQpgYGANCg0K</div>
+<div id="rmd-source-code">LS0tDQp0aXRsZTogIktOTiBDcm9zcyBWYWxpZGF0aW9uIg0Kb3V0cHV0OiBodG1sX25vdGVib29rDQotLS0NCg0KIyMgQ3Jvc3MgVmFsaWRhdGlvbiBFeHBsYW5hdGlvbiBhbmQgUmVhc29uaW5nDQoNCkJlZm9yZSBwcm9jZWVkaW5nLCBsZXQncyByZWNhbGwgaG93IHRoaXMgY3Jvc3MgdmFsaWRhdGlvbiBzaGFsbCBiZSBkb25lLiBXZSBhcmUgZG9pbmcgTE9PQ1YsIHNpbmNlIGstZm9sZHMgaXMgYSBiaXQgZXh0cmVtZS4gQnkgdGhhdCBJIG1lYW4gdGhhdCBsZWF2aW5nIG91dCBzYXkgMTAlIG9mIHRoZSBkcnVncyB3aGVuIGNvbnN0cnVjdGluZyB0aGUgbmV0d29yayBjb3VsZCByZWFsbHkgY2hhbmdlIHRoZSByZXN1bHRpbmcgbmV0d29yaywgd2hpY2ggaXMgbm90IHdoYXQgd2Ugd2FudC4gRnVydGhlcm1vcmUsIHRoaXMgaXMgbm90IGFuIGFjY3VyYXRlIHVzZSBjYXNlIHNpbmNlIGEgdXNlciBtaWdodCB1cGxvYWQgb25lIG9yIHR3byBkcnVncyBhdCBtb3N0LiANCg0KU28sIGxldCdzIGdpdmUgdGhlIHN0ZXBzIGZvciB3aGF0IHRoaXMgYWxnbyBsb29rcyBsaWtlLiBGb3IgYWxsIGRydWdzIHRoYXQgd2UgaGF2ZSB0YXJnZXQgZGF0YSBmb3I6DQoNCjEuIFBpY2sgYSBkcnVnIFggdG8gbGVhdmUgb3V0DQoyLiBDb21wdXRlIHRoZSBpbnRlZ3JhdGVkIG5ldHdvcmsgdXNpbmcgYWxsIGRydWdzIGJ1dCBYLiBDYWxsIHRoaXMgTmV0LjENCjMuIENvbXB1dGUgdGhlIGludGVncmF0ZWQgbmV0d29yayB1c2luZyBhbGwgZHJ1Z3MgaW5jbHVkaW5nIFguIENhbGwgdGhpcyBOZXQuMg0KNC4gT3ZlcndyaXRlIHRoZSB2YWx1ZXMgaW4gTmV0LjIgdXNpbmcgdGhlIHZhbHVlcyBmcm9tIE5ldC4xIGZvciBhbGwgZHJ1Z3MgZXhjZXB0IFgNCjUuIEV2YWx1YXRlIHRoZSB0b3AgNSBhY2N1cmFjeSBvbiBYIHVzaW5nIHRoZSBtb2RpZmllZCBOZXQuMiBmcm9tIHN0ZXAgNA0KDQoNCiMjIFVzaW5nIGN0cnB2MiB0YXJnZXRzDQoNCmBgYHtyIHNldHVwfQ0Ka25pdHI6Om9wdHNfa25pdCRzZXQocm9vdC5kaXIgPSBub3JtYWxpemVQYXRoKCcuLi8uLi8nKSkNCmdldHdkKCkNCmBgYA0KDQoNCldlIGJlZ2luIGJ5IHJ1bm5pbmcgdGhlIHNjcmlwdCB0aGF0IGNvbXB1dGVzIGF1YyBpbiBvcmRlciB0byBvYnRhaW4gdGhlIGludGVncmF0ZWQgbmV0d29yay4NCg0KSW4gb3JkZXIgdG8gZG8gc28sIHdlIGZpcnN0IGxvYWQgaW4gYWxsIG5lY2Vzc2FyeSBsaWJyYXJpZXMgYW5kIHNjcmlwdHMNCg0KYGBge3IsIG1lc3NhZ2U9RkFMU0UsIHdhcm5pbmc9RkFMU0UsIGVjaG89RkFMU0V9DQpybShsaXN0PWxzKCkpDQoNCmxpYnJhcnkoUGhhcm1hY29HeCkNCmxpYnJhcnkoYXBjbHVzdGVyKQ0KbGlicmFyeShyY2RrKQ0KbGlicmFyeShmaW5nZXJwcmludCkNCmxpYnJhcnkoYW5ub3RhdGUpDQpsaWJyYXJ5KG9yZy5Icy5lZy5kYikNCmxpYnJhcnkoU05GdG9vbCkNCmxpYnJhcnkoUk9DUikNCmxpYnJhcnkoc3VydmNvbXApDQpsaWJyYXJ5KHJlc2hhcGUyKQ0KbGlicmFyeShwcm94eSkNCmxpYnJhcnkoUFJST0MpDQpsaWJyYXJ5KGFwY2x1c3RlcikNCmxpYnJhcnkocHJvZnZpcykNCg0KbGlicmFyeShkb1BhcmFsbGVsKQ0KbGlicmFyeShmb3JlYWNoKQ0KDQpzb3VyY2UoIlJDb2RlL2ZsZXhpYmxlX2xheWVycy9zdHJ1Y3R1cmVEYXRhRmxleGlibGUuUiIpDQpzb3VyY2UoIlJDb2RlL2ZsZXhpYmxlX2xheWVycy9zZW5zaXRpdml0eURhdGFGbGV4aWJsZS5SIikNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL3BlcnR1cmJhdGlvbkRhdGFGbGV4aWJsZS5SIikNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL3BlcnR1cmJhdGlvbkRhdGFGbGV4aWJsZUN1c3RvbVNpZy5SIikNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL2x1bWluZXhEYXRhRmxleGlibGUuUiIpDQpzb3VyY2UoIlJDb2RlL2ZsZXhpYmxlX2xheWVycy9pbWFnaW5nRGF0YUZsZXhpYmxlLlIiKQ0KDQpzb3VyY2UoIlJDb2RlL2ZsZXhpYmxlX2xheWVycy9jb25zdFNlbnNpdGl2aXR5TGF5ZXJGbGV4aWJsZS5SIikNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL2NvbnN0U3RydWN0dXJlTGF5ZXJGbGV4aWJsZS5SIikNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL2NvbnN0THVtaW5leExheWVyRmxleGlibGUuUiIpDQpzb3VyY2UoIlJDb2RlL2ZsZXhpYmxlX2xheWVycy9jb25zdEltYWdpbmdMYXllckZsZXhpYmxlLlIiKQ0Kc291cmNlKCJSQ29kZS9mbGV4aWJsZV9sYXllcnMvY29uc3RQZXJ0dXJiYXRpb25MYXllckZsZXhpYmxlLlIiKQ0KDQpzb3VyY2UoIlJDb2RlL2ZsZXhpYmxlX2xheWVycy9pbnRlZ3JhdGVMYXllcnNGbGV4aWJsZS5SIikNCnNvdXJjZSgiUkNvZGUvZmxleGlibGVfbGF5ZXJzL2RydWdUYXJnZXRCZW5jaEZsZXhpYmxlLlIiKQ0Kc291cmNlKCJSQ29kZS9mbGV4aWJsZV9sYXllcnMvc3RhY2tlZExheWVyQW5hbHlzaXNIZWxwZXJzLlIiKQ0KDQpzb3VyY2UoIlJDb2RlL2NpbmRleENvbXAyLlIiKQ0Kc291cmNlKCJSQ29kZS9wcmVkUGVyZi5SIikNCg0Kc291cmNlKCJSQ29kZS9rbm4va25uQ1YuUiIpDQpzb3VyY2UoIlJDb2RlL2tubi9rbm5IZWxwZXJzLlIiKQ0Kc291cmNlKCJSQ29kZS9rbm4vZHJ1Z1RhcmdldHNLTk4uUiIpDQoNCnNvdXJjZSgiUkNvZGUvZ29sZGVuYmVyZ19pbXB1dGF0aW9uL21lZGlhblNpbWlsYXJpdHkuUiIpDQpzb3VyY2UoIlJDb2RlL3ZhbHVlX2luZmVyZW5jZV9tb2RlbHMvbW9kaWZ5aW5nX3NuZi9zbmZNb2RpZmllZEhlbHBlcnMuUiIpDQoNCnNvdXJjZSgiUkNvZGUvZm9yZWFjaF91dGlscy9mb3JlYWNoVXRpbHMuUiIpDQoNCiMgTG9hZCBsaW5jcyBtZXRhZGF0YSBhbmQgY2xlYW4gdGhlIHBlcnRfaW5hbWVzIGluIGl0DQpiYWRjaGFycyA8LSAiW1x4YjVdfFtcbl18WyxdfFs7XXxbOl18Wy1dfFsrXXxbKl18WyVdfFskXXxbI118W3tdfFt9XXxbW118W11dfFt8XXxbXFxeXXxbL118W1xcXXxbLl18W19dfFsgXSINCmxpbmNzLm1ldGEgPC0gcmVhZC5jc3YoIkRhdGEvTElOQ1MuY3N2Iiwgc3RyaW5nc0FzRmFjdG9ycyA9IEZBTFNFKQ0KbGluY3MubWV0YSRwZXJ0X2luYW1lIDwtIHRvdXBwZXIobGluY3MubWV0YSRwZXJ0X2luYW1lKQ0KbGluY3MubWV0YSRwZXJ0X2luYW1lIDwtIGdzdWIoYmFkY2hhcnMsICIiLCBsaW5jcy5tZXRhJHBlcnRfaW5hbWUpDQoNCnBlcnQuZmlsZS5uYW1lIDwtICJEYXRhL3BlcnRfc2lnc182X2hvdXIvcGVydF9mZWF0dXJlc19mdWxsLlJEYXRhIg0Kc2Vuc2l0aXZpdHkuZmlsZS5uYW1lIDwtICJEYXRhL2NvbWJpbmVkX3NlbnNpdGl2aXR5Ly9jb21iaW5lZF9zZW5zX2luYW1lX3JlcGxhY2VkLlJEYXRhIg0Kc291cmNlKCJSQ29kZS9mbGV4aWJsZV9sYXllcnMvc3RhY2tlZExheWVyQW5hbHlzaXMuUiIpDQojICBEcnVncyB0aGF0IGFyZSBjb21tb24gYmV0d2VlbiBuZXcgc2lnbmF0dXJlcyBhbmQgc2VucyBkYXRhLiBUaGlzIGlzIG5lZWRlZCB0byBjb21wYXJlIGFwcGxlcyB3aXRoIGFwcGxlcw0KIyBpbiB0ZXJtcyBoYXZpbmcgYmVuY2htYXJrcyB0aGF0IGluY2x1ZGUgdGhlIHNhbWUgZHJ1Z3MgaW4gdGhlbS4NCmBgYA0KDQojIyMgTG9hZCBEYXRhIEZvciBMYXllcnMNCg0KV2Ugc3RhcnQgYnkgbG9hZGluZyBpbiB0aGUgbGluY3MgbWV0YWRhdGEgZmlsZSB3aGljaCBpcyB1c2VkIHRvIG1hdGNoIHNlbnN0aXZpdHkgZHJ1ZyBuYW1lcyB0byB0aGUgbDEwMDAgc2lnbmF0dXJlcyBzaW5jZSBhcmUgaW5kZXhlZCBhY2NvcmRpbmcgdG8gcGVydF9pZCBpbnN0ZWFkIG9mIHBlcnRfaW5hbWUuIEl0IGFsc28gY29udGFpbnMgdGhlIHNtaWxlcyBzdHJpbmdzIGZvciBhbGwgdGhlIGNvbXBvdW5kcyBpbiBMMTAwMCwgYW5kIHRoZXNlIGFyZSB1c2VkIHRvIGNyZWF0ZSB0aGUgc3RydWN0dXJlIGxheWVyLg0KDQpgYGB7cn0NCmxpbmNzLm1ldGEgPC0gcmVhZC5jc3YoIkRhdGEvTElOQ1MuY3N2Iiwgc3RyaW5nc0FzRmFjdG9ycyA9IEZBTFNFKQ0KbGluY3MubWV0YSRwZXJ0X2luYW1lIDwtIHRvdXBwZXIobGluY3MubWV0YSRwZXJ0X2luYW1lKQ0KbGluY3MubWV0YSRwZXJ0X2luYW1lIDwtIGdzdWIoYmFkY2hhcnMsICIiLCBsaW5jcy5tZXRhJHBlcnRfaW5hbWUpDQpgYGANCg0KTm93IHRvIGxvYWQgaW4gdGhlIHNlbnNpdGl2aXR5IGNvcnJlbGF0aW9ucyBhbmQgdGhlIHBlcnQgc2lnbmF0dXJlcw0KDQpgYGB7cn0NCnNlbnMuZGF0YSA8LSBTZW5zaXRpdml0eURhdGFGbGV4aWJsZShzZW5zaXRpdml0eS5maWxlLm5hbWUpDQpwZXJ0LmRhdGEgPC0gUGVydHVyYmF0aW9uRGF0YUZsZXhpYmxlQ3VzdG9tU2lnKHBlcnQuZmlsZS5uYW1lKQ0KYGBgDQoNCktlZXAgaW4gbWluZCB0aGF0IHRoZSBuZXcgc2lnbmF0dXJlcyBhcmUgbWlzc2luZyA4IGRydWdzIHNpbmNlIHRoZXkgd2VyZSBjb21wdXRlZCBvbiBvbmx5IDkgY2VsbCBsaW5lcy4gVGh1cywgd2hlbiB3ZSBjb21wdXRlIHRoZSBjb21tb24gZHJ1Z3MgbGF0ZXIsIHRoZXkgc2hvdWxkIGJlIGJhc2VkIG9uIHRoZSBpbnRlcnNlY3Rpb24gYmV0d2VlbiBzZW5zIGFuZCB0aGUgbmV3IHBlcnQgc2lnbmF0dXJlcy4NCg0KU3Vic2V0IHRoZSBsaW5jcyBtZXRhZGF0YSBmaWxlIHRvIG9ubHkgdGhlIGRydWdzIGFwcGVhcmluZyBpbiB0aGUgc2Vuc2l0aXZpdHkgbGF5ZXINCg0KYGBge3J9DQpzZW5zLm5hbWVzIDwtIHJvd25hbWVzKHNlbnMuZGF0YSkNCg0KbGluY3MubWV0YS5zdWJzZXQgPC0gbGluY3MubWV0YVttYXRjaChzZW5zLm5hbWVzLCBsaW5jcy5tZXRhJHBlcnRfaW5hbWUpLF0NCmxpbmNzLm1ldGEuc3Vic2V0IDwtIGxpbmNzLm1ldGEuc3Vic2V0WyFpcy5uYShsaW5jcy5tZXRhLnN1YnNldCRYKSxdDQpgYGANCg0KTm93IHdlIGNyZWF0ZSB0aGUgc3RydWN0dXJlIGZpbmdlcnByaW50cyBiYXNlZCBvbiB0aGUgc3Vic2V0dGVkIGxpbmNzIG1ldGFkYXRhDQoNCmBgYHtyfQ0Kc3RyYy5kYXRhIDwtIFN0cnVjdHVyZURhdGFGbGV4aWJsZShsaW5jcy5tZXRhLnN1YnNldCkgICMjIGEgdmVjdG9yICAtLT4gMjM5IGVsZW1udHMNCmBgYA0KDQojIyMgRmluZCBDb21tb24gRHJ1Z3MNCg0KTm90aWNlIGhvdyB3ZSBhcmVuJ3QgaW5jbHVkaW5nIHRoZSBwZXJ0IGxheWVyIHdoZW4gZGV0ZXJtaW5pbmcgdGhlIGNvbW1vbiBkcnVncy4gV2UgYWxyZWFkeSBrbm93IHRoYXQgaXQgaXMgbWlzc2luZyA4IGRydWdzLCBzbyB0aG9zZSBkcnVncyB3aWxsIGp1c3QgYmUgaW1wdXRlZCBsYXRlciBvbi4NCg0KYGBge3J9DQpsYXllcnMgPC0gbGlzdChzZW5zLm5hbWVzID0gc29ydChjb2xuYW1lcyhzZW5zLmRhdGEpKSwgDQogICAgICAgICAgICAgICBzdHJjLm5hbWVzID0gbmFtZXMoc3RyYy5kYXRhKSkNCmNvbW1vbi5kcnVncyA8LSBSZWR1Y2UoaW50ZXJzZWN0LCBGaWx0ZXIoTmVnYXRlKGlzLm51bGwpLGxheWVycykpDQpwcmludChsZW5ndGgoY29tbW9uLmRydWdzKSkNCmBgYA0KDQojIyMgQ3JlYXRlIFNpbWlsYXJpdHkgTWF0cmljZXMNCg0KYGBge3J9DQpkYXRhLmJlbmNoIDwtIERydWdUYXJnZXRzS05OKGNvbW1vbi5kcnVncywgZ210X2ZpbGVfbmFtZT0idGVtcCIsIHVzZS5jdHJwdjI9VFJVRSwNCiAgICAgICAgICAgICAgICAgICAgICAgIHVzZS5jbHVlPUZBTFNFLCB1c2UuY2hlbWJsPUZBTFNFLCB1c2UuZGJhbms9RkFMU0UsIHVzZS5kdGM9RkFMU0UpDQpkYXRhLmJlbmNoW10gPC0gbGFwcGx5KGRhdGEuYmVuY2gsIGFzLmNoYXJhY3RlcikNCmJlbmNobWFyay5kcnVncyA8LSB1bmlxdWUoZGF0YS5iZW5jaCRNT0xFQ1VMRV9OQU1FKQ0KYGBgDQoNClNvIHRoZSBzZW5zdGl2aXR5IGRhdGEgaXMgYWxyZWFkeSBhIGNvcnJlbGF0aW9uIG1hdHJpeCwgdGhlcmVmb3JlIHRoZXJlIGlzIG5vdGhpbmcgdG8gZG8gdGhlcmUuIFdlIGp1c3QgbmVlZCB0byBjb21wdXRlIHRoZSBzaW1pbGFyaXRpZXMgZm9yIHRoZSBwZXJ0IGxheWVyIG9uIGJvdGggdGhlIG9sZCBhbmQgbmV3IHNpZ25hdHVyZXMsIGFzIHdlbGwgYXMgdGhlIHN0cnVjdHVyZSBsYXllci4NCg0KYGBge3J9DQpzZW5zLmNvciA8LSBzZW5zLmRhdGFbY29tbW9uLmRydWdzLCBjb21tb24uZHJ1Z3NdDQoNCnBlcnQuY29yIDwtIGNvcihwZXJ0LmRhdGFbLCBpbnRlcnNlY3QoY29tbW9uLmRydWdzLCBjb2xuYW1lcyhwZXJ0LmRhdGEpKV0sIG1ldGhvZD0icGVhcnNvbiIsIHVzZT0icGFpcndpc2UuY29tcGxldGUub2JzIikNCg0KcGVydC5jb3IgPC0gbWVkaWFuU2ltaWxhcml0eShsaXN0KHBlcnQuY29yKSlbWzFdXQ0KDQpzdHJjLmNvciA8LSBmaW5nZXJwcmludDo6ZnAuc2ltLm1hdHJpeChzdHJjLmRhdGFbY29tbW9uLmRydWdzXSwgbWV0aG9kID0gInRhbmltb3RvIikNCnJvd25hbWVzKHN0cmMuY29yKSA8LSBuYW1lcyhzdHJjLmRhdGFbY29tbW9uLmRydWdzXSkNCmNvbG5hbWVzKHN0cmMuY29yKSA8LSBuYW1lcyhzdHJjLmRhdGFbY29tbW9uLmRydWdzXSkNCmBgYA0KDQojIyMgSW50ZWdyYXRlIExheWVycw0KDQpgYGB7cn0NCmFsbC5kcnVncyA8LSBjb21tb24uZHJ1Z3MNCg0KY29ycmVsYXRpb24ubWF0cmljZXMgPC0gbGlzdChzZW5zPXNlbnMuY29yLCBwZXJ0PXBlcnQuY29yLCBzdHJjPXN0cmMuY29yKQ0KDQppbnRlZ3JhdGVkIDwtIEludGVncmF0ZUNvcnJlbGF0aW9uTWF0cmljZXMoY29ycmVsYXRpb24ubWF0cmljZXMsIGFsbC5kcnVncykNCmBgYA0KDQpgYGB7cn0NCmRhdGEuYmVuY2ggPC0gRHJ1Z1RhcmdldHNLTk4oY29tbW9uLmRydWdzLCANCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZ210LmZpbGUubmFtZSwgdXNlLmN0cnB2Mj1UUlVFLA0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICB1c2UuY2x1ZT1GQUxTRSwgdXNlLmNoZW1ibD1GQUxTRSwNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdXNlLmRiYW5rPUZBTFNFLCB1c2UuZHRjPUZBTFNFKSAjIDE0MSB4IDE0MSBkcnVnLWRydWcgYWRqYWNlbmN5IG1hdHJpeCAtLT4gMTQxDQpkYXRhLmJlbmNoW10gPC0gbGFwcGx5KGRhdGEuYmVuY2gsIGFzLmNoYXJhY3RlcikNCg0KYGBgDQoNClRoZSBzbWFydGVzdCB3YXkgdG8gZG8gdGhpcyBzbyB0aGF0IHRoaW5ncyBhcmUgZWZmaWNpZW50IGlzIHRvIGZpcnN0IGNvbXB1dGUgYWxsIHRoZSBkaWZmZXJlbnQgcG9zc2libGUgbmV0d29ya3Mgd2l0aCBvbmUgZHJ1ZyBsZWZ0IG91dCAob25seSB0aGUgZHJ1Z3MgdGhhdCBhcmUgaW4gdGhlIGJlbmNobWFyayBzaW5jZSB0aG9zZSBhcmUgdGhlIG9uZXMgdGhhdCB3ZSBhcmUgZXZhbHVhdGluZyBwZXJmb3JtYW5jZSBvbiksIGFuZCB0aGVuIGxhdGVyIG9uIGdvIGFuZCBzZWUgaG93IGRpZmZlcmVudCB2YWx1ZXMgb2YgayBhZmZlY3QgYWNjdXJhY3kuIFRoaXMgd2F5LCB3ZSBhdm9pZCByZWNvbXB1dGluZyB0aGUgZGlmZmVyZW50IG5ldHdvcmtzIGZvciBlYWNoIHZhbHVlIG9mIGsuDQoNCmBgYHtyfQ0KbG9vLm5ldHdvcmtzIDwtIENyZWF0ZUxlYXZlT25lT3V0TmV0d29ya3MoaW50ZWdyYXRlZCwgY29ycmVsYXRpb24ubWF0cmljZXMsIGFsbC5kcnVncywgZGF0YS5iZW5jaCkNCmBgYA0KDQpOb3cgd2UgZXZhbHVhdGUgdGhlIEtOTiBwZXJmb3JtYW5jZSBmb3IgZWFjaCBsZWF2ZS1vbmUtb3V0IG5ldHdvcmsgb24gYSBkcnVnIGJ5IGRydWcgYmFzaXMuDQoNCmBgYHtyfQ0KbnVtLm5laWdoYm91cnMgPC0gMTozMA0KDQpjMSA8LSBtYWtlQ2x1c3Rlcig4LCBvdXRmaWxlPSIiKQ0KcmVnaXN0ZXJEb1BhcmFsbGVsKGMxKQ0KDQphY2N1cmFjaWVzIDwtIGZvcmVhY2goaz1udW0ubmVpZ2hib3VycywgLnBhY2thZ2VzPWMoIk1hdHJpeENvcnJlbGF0aW9uIiwgImZvcmVhY2giKSkgJWRvcGFyJSB7DQogICAgZm9yZWFjaChkcnVnPXVuaXF1ZShkYXRhLmJlbmNoJE1PTEVDVUxFX05BTUUpLCAuY29tYmluZT0iYyIsIC5wYWNrYWdlcz1jKCJNYXRyaXhDb3JyZWxhdGlvbiIsICJmb3JlYWNoIikpICVkbyUgew0KICAgICAgICBuZXQuMiA8LSBsb28ubmV0d29ya3NbW2RydWddXQ0KICAgICAgICBhY2MgPC0gR2V0S05OQWNjdXJhY3lTaW5nbGUoaywgbmV0LjIsIGRhdGEuYmVuY2gsIGRydWcsIHNjYWxlLmRpc3RhbmNlPUYpDQogICAgICAgIG5hbWVzKGFjYykgPC0gZHJ1Zw0KICAgICAgICANCiAgICAgICAgYWNjDQogICAgfQ0KfQ0KDQpuYW1lcyhhY2N1cmFjaWVzKSA8LSBhcy5jaGFyYWN0ZXIobnVtLm5laWdoYm91cnMpDQoNCnN0b3BDbHVzdGVyKGMxKQ0KYGBgDQoNCkZpbmFsbHksIHdlIG91dHB1dCB0aGUgYWNjdXJhY2llcyBhbmQgZGV0ZXJtaW5lIHRoZSBvcHRpbWFsIHZhbHVlIG9mIGsNCg0KYGBge3J9DQpmb3IgKGsgaW4gYXMuY2hhcmFjdGVyKG51bS5uZWlnaGJvdXJzKSkgew0KICAgIGFjY3VyYWN5IDwtIHN1bShhY2N1cmFjaWVzW1trXV0pIC8gbGVuZ3RoKGFjY3VyYWNpZXNbW2tdXSkNCiAgICANCiAgICBjYXQocGFzdGUoIms9IiwgaywgIiBhY2N1cmFjeToiLCBhY2N1cmFjeSwgIlxuIiwgc2VwPSIiKSkNCn0NCmBgYA0KDQojIyBVc2luZyBDb21iaW5lZCBEcnVnIFRhcmdldCBEYXRhc2V0DQoNCiMjIyBJbnRlZ3JhdGUgTGF5ZXJzDQoNCmBgYHtyfQ0KYWxsLmRydWdzIDwtIGNvbW1vbi5kcnVncw0KDQpjb3JyZWxhdGlvbi5tYXRyaWNlcyA8LSBsaXN0KHNlbnM9c2Vucy5jb3IsIHBlcnQ9cGVydC5jb3IsIHN0cmM9c3RyYy5jb3IpDQoNCmludGVncmF0ZWQgPC0gSW50ZWdyYXRlQ29ycmVsYXRpb25NYXRyaWNlcyhjb3JyZWxhdGlvbi5tYXRyaWNlcywgYWxsLmRydWdzKQ0KYGBgDQoNCmBgYHtyfQ0KZGF0YS5iZW5jaCA8LSBEcnVnVGFyZ2V0c0tOTihjb21tb24uZHJ1Z3MsIA0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICBnbXQuZmlsZS5uYW1lLCB1c2UuY3RycHYyPVRSVUUsDQogICAgICAgICAgICAgICAgICAgICAgICAgICAgIHVzZS5jbHVlPVRSVUUsIHVzZS5jaGVtYmw9VFJVRSwNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdXNlLmRiYW5rPVRSVUUsIHVzZS5kdGM9RkFMU0UpICMgMTQxIHggMTQxIGRydWctZHJ1ZyBhZGphY2VuY3kgbWF0cml4IC0tPiAxNDENCmRhdGEuYmVuY2hbXSA8LSBsYXBwbHkoZGF0YS5iZW5jaCwgYXMuY2hhcmFjdGVyKQ0KYGBgDQoNCmBgYHtyfQ0KbG9vLm5ldHdvcmtzIDwtIENyZWF0ZUxlYXZlT25lT3V0TmV0d29ya3MoaW50ZWdyYXRlZCwgY29ycmVsYXRpb24ubWF0cmljZXMsIGFsbC5kcnVncywgZGF0YS5iZW5jaCkNCmBgYA0KDQpOb3cgd2UgZXZhbHVhdGUgdGhlIEtOTiBwZXJmb3JtYW5jZSBmb3IgZWFjaCBsZWF2ZS1vbmUtb3V0IG5ldHdvcmsgb24gYSBkcnVnIGJ5IGRydWcgYmFzaXMuDQoNCmBgYHtyfQ0KbnVtLm5laWdoYm91cnMgPC0gMTozMA0KDQpjMSA8LSBtYWtlQ2x1c3Rlcig4LCBvdXRmaWxlPSIiKQ0KcmVnaXN0ZXJEb1BhcmFsbGVsKGMxKQ0KDQphY2N1cmFjaWVzIDwtIGZvcmVhY2goaz1udW0ubmVpZ2hib3VycywgLnBhY2thZ2VzPWMoIk1hdHJpeENvcnJlbGF0aW9uIiwgImZvcmVhY2giKSkgJWRvcGFyJSB7DQogICAgZm9yZWFjaChkcnVnPXVuaXF1ZShkYXRhLmJlbmNoJE1PTEVDVUxFX05BTUUpLCAuY29tYmluZT0iYyIsIC5wYWNrYWdlcz1jKCJNYXRyaXhDb3JyZWxhdGlvbiIsICJmb3JlYWNoIikpICVkbyUgew0KICAgICAgICBuZXQuMiA8LSBsb28ubmV0d29ya3NbW2RydWddXQ0KICAgICAgICBhY2MgPC0gR2V0S05OQWNjdXJhY3lTaW5nbGUoaywgbmV0LjIsIGRhdGEuYmVuY2gsIGRydWcsIHNjYWxlLmRpc3RhbmNlPUYpDQogICAgICAgIG5hbWVzKGFjYykgPC0gZHJ1Zw0KICAgICAgICANCiAgICAgICAgYWNjDQogICAgfQ0KfQ0KDQpuYW1lcyhhY2N1cmFjaWVzKSA8LSBhcy5jaGFyYWN0ZXIobnVtLm5laWdoYm91cnMpDQoNCnN0b3BDbHVzdGVyKGMxKQ0KYGBgDQoNCkZpbmFsbHksIHdlIG91dHB1dCB0aGUgYWNjdXJhY2llcyBhbmQgZGV0ZXJtaW5lIHRoZSBvcHRpbWFsIHZhbHVlIG9mIGsNCg0KYGBge3J9DQpmb3IgKGsgaW4gYXMuY2hhcmFjdGVyKG51bS5uZWlnaGJvdXJzKSkgew0KICAgIGFjY3VyYWN5IDwtIHN1bShhY2N1cmFjaWVzW1trXV0pIC8gbGVuZ3RoKGFjY3VyYWNpZXNbW2tdXSkNCiAgICANCiAgICBjYXQocGFzdGUoIms9IiwgaywgIiBhY2N1cmFjeToiLCBhY2N1cmFjeSwgIlxuIiwgc2VwPSIiKSkNCn0NCmBgYA0KDQoNCg0K</div>
 
 
 

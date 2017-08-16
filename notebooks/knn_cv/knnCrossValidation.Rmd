@@ -15,14 +15,11 @@ So, let's give the steps for what this algo looks like. For all drugs that we ha
 4. Overwrite the values in Net.2 using the values from Net.1 for all drugs except X
 5. Evaluate the top 5 accuracy on X using the modified Net.2 from step 4
 
-## Performance Without Imputation
 
-
-
-### Using ctrpv2 targets
+## Using ctrpv2 targets
 
 ```{r setup}
-knitr::opts_knit$set(root.dir = normalizePath('.../../'))
+knitr::opts_knit$set(root.dir = normalizePath('../../'))
 getwd()
 ```
 
@@ -33,6 +30,24 @@ In order to do so, we first load in all necessary libraries and scripts
 
 ```{r, message=FALSE, warning=FALSE, echo=FALSE}
 rm(list=ls())
+
+library(PharmacoGx)
+library(apcluster)
+library(rcdk)
+library(fingerprint)
+library(annotate)
+library(org.Hs.eg.db)
+library(SNFtool)
+library(ROCR)
+library(survcomp)
+library(reshape2)
+library(proxy)
+library(PRROC)
+library(apcluster)
+library(profvis)
+
+library(doParallel)
+library(foreach)
 
 source("RCode/flexible_layers/structureDataFlexible.R")
 source("RCode/flexible_layers/sensitivityDataFlexible.R")
@@ -54,23 +69,14 @@ source("RCode/flexible_layers/stackedLayerAnalysisHelpers.R")
 source("RCode/cindexComp2.R")
 source("RCode/predPerf.R")
 
+source("RCode/knn/knnCV.R")
 source("RCode/knn/knnHelpers.R")
 source("RCode/knn/drugTargetsKNN.R")
 
-library(PharmacoGx)
-library(apcluster)
-library(rcdk)
-library(fingerprint)
-library(annotate)
-library(org.Hs.eg.db)
-library(SNFtool)
-library(ROCR)
-library(survcomp)
-library(reshape2)
-library(proxy)
-library(PRROC)
-library(apcluster)
-library(profvis)
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/foreach_utils/foreachUtils.R")
 
 # Load lincs metadata and clean the pert_inames in it
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
@@ -78,21 +84,90 @@ lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
 lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
 lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
 
-pert.file.name <- "Data/L1000_compound_signatures_sub.rds"
+pert.file.name <- "Data/pert_sigs_6_hour/pert_features_full.RData"
 sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
 source("RCode/flexible_layers/stackedLayerAnalysis.R")
 #  Drugs that are common between new signatures and sens data. This is needed to compare apples with apples
 # in terms having benchmarks that include the same drugs in them.
 ```
 
-Let's figure out the drugs in common between the 3 standard layers using the old perturbation signatures. By doing so, we can remove a drug one at a time.
+### Load Data For Layers
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
 
 ```{r}
-sens.data <- readRDS(sensitivity.file.name)
-common.drugs <- intersect(colnames(sens.data), lincs.meta$pert_iname)
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
 ```
 
-We determine the relevant drug targets for the drugs common between the layers. For now, we focus on targets from the  ctrpv2 dataset. 
+Now to load in the sensitivity correlations and the pert signatures
+
+```{r}
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)
+pert.data <- PerturbationDataFlexibleCustomSig(pert.file.name)
+```
+
+Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+### Find Common Drugs
+
+Notice how we aren't including the pert layer when determining the common drugs. We already know that it is missing 8 drugs, so those drugs will just be imputed later on.
+
+```{r}
+layers <- list(sens.names = sort(colnames(sens.data)), 
+               strc.names = names(strc.data))
+common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+print(length(common.drugs))
+```
+
+### Create Similarity Matrices
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+So the senstivity data is already a correlation matrix, therefore there is nothing to do there. We just need to compute the similarities for the pert layer on both the old and new signatures, as well as the structure layer.
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+
+pert.cor <- cor(pert.data[, intersect(common.drugs, colnames(pert.data))], method="pearson", use="pairwise.complete.obs")
+
+pert.cor <- medianSimilarity(list(pert.cor))[[1]]
+
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
+rownames(strc.cor) <- names(strc.data[common.drugs])
+colnames(strc.cor) <- names(strc.data[common.drugs])
+```
+
+### Integrate Layers
+
+```{r}
+all.drugs <- common.drugs
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
+
+integrated <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+```
 
 ```{r}
 data.bench <- DrugTargetsKNN(common.drugs, 
@@ -103,48 +178,101 @@ data.bench[] <- lapply(data.bench, as.character)
 
 ```
 
-Now let's loop over all the drugs in `data.bench` and execute the algo mentioned at the top of this notebook.
+The smartest way to do this so that things are efficient is to first compute all the different possible networks with one drug left out (only the drugs that are in the benchmark since those are the ones that we are evaluating performance on), and then later on go and see how different values of k affect accuracy. This way, we avoid recomputing the different networks for each value of k.
 
 ```{r}
-g <- profvis({
-    integrated.all <- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
-        use.imaging=FALSE, use.luminex=FALSE, 
-         sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
-        lincs.meta=lincs.meta,
-         atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
-         use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=FALSE, common.drugs=NULL,
-        compute.drug.target.bench=FALSE, use.subsetted.pert = TRUE)
-})
-integrated.all <- integrated.all$integrated
+loo.networks <- CreateLeaveOneOutNetworks(integrated, correlation.matrices, all.drugs, data.bench)
 ```
 
+Now we evaluate the KNN performance for each leave-one-out network on a drug by drug basis.
 
 ```{r}
-accuracies <- numeric(length(unique(data.bench$MOLECULE_NAME)))
-names(accuracies) <- unique(data.bench$MOLECULE_NAME)
-k <- 7
+num.neighbours <- 1:30
 
-for (drug in unique(data.bench$MOLECULE_NAME)) {
-    common.drugs.one.out <- setdiff(common.drugs, drug)
+c1 <- makeCluster(8, outfile="")
+registerDoParallel(c1)
+
+accuracies <- foreach(k=num.neighbours, .packages=c("MatrixCorrelation", "foreach")) %dopar% {
+    foreach(drug=unique(data.bench$MOLECULE_NAME), .combine="c", .packages=c("MatrixCorrelation", "foreach")) %do% {
+        net.2 <- loo.networks[[drug]]
+        acc <- GetKNNAccuracySingle(k, net.2, data.bench, drug, scale.distance=F)
+        names(acc) <- drug
+        
+        acc
+    }
+}
+
+names(accuracies) <- as.character(num.neighbours)
+
+stopCluster(c1)
+```
+
+Finally, we output the accuracies and determine the optimal value of k
+
+```{r}
+for (k in as.character(num.neighbours)) {
+    accuracy <- sum(accuracies[[k]]) / length(accuracies[[k]])
     
-    net.1 <- EvaluateModelROC(use.sensitivity=TRUE, use.perturbation=TRUE, use.structure=TRUE,
-            use.imaging=FALSE, use.luminex=FALSE, 
-             sensitivity.file.name=sensitivity.file.name, pert.file.name=pert.file.name, 
-            lincs.meta=lincs.meta,
-             atc.benchmark.name="chembl-new", compute.atc=FALSE, use.ctrpv2=TRUE, use.clue=FALSE,
-             use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE, create.communities=FALSE, base.dir="Output/auc_p_flex", pert.new=FALSE, common.drugs=common.drugs.one.out,
-            compute.drug.target.bench=FALSE, use.subsetted.pert = TRUE)$integrated
+    cat(paste("k=", k, " accuracy:", accuracy, "\n", sep=""))
+}
+```
+
+## Using Combined Drug Target Dataset
+
+### Integrate Layers
+
+```{r}
+all.drugs <- common.drugs
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor, strc=strc.cor)
+
+integrated <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+```
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, 
+                             gmt.file.name, use.ctrpv2=TRUE,
+                             use.clue=TRUE, use.chembl=TRUE,
+                             use.dbank=TRUE, use.dtc=FALSE) # 141 x 141 drug-drug adjacency matrix --> 141
+data.bench[] <- lapply(data.bench, as.character)
+```
+
+```{r}
+loo.networks <- CreateLeaveOneOutNetworks(integrated, correlation.matrices, all.drugs, data.bench)
+```
+
+Now we evaluate the KNN performance for each leave-one-out network on a drug by drug basis.
+
+```{r}
+num.neighbours <- 1:30
+
+c1 <- makeCluster(8, outfile="")
+registerDoParallel(c1)
+
+accuracies <- foreach(k=num.neighbours, .packages=c("MatrixCorrelation", "foreach")) %dopar% {
+    foreach(drug=unique(data.bench$MOLECULE_NAME), .combine="c", .packages=c("MatrixCorrelation", "foreach")) %do% {
+        net.2 <- loo.networks[[drug]]
+        acc <- GetKNNAccuracySingle(k, net.2, data.bench, drug, scale.distance=F)
+        names(acc) <- drug
+        
+        acc
+    }
+}
+
+names(accuracies) <- as.character(num.neighbours)
+
+stopCluster(c1)
+```
+
+Finally, we output the accuracies and determine the optimal value of k
+
+```{r}
+for (k in as.character(num.neighbours)) {
+    accuracy <- sum(accuracies[[k]]) / length(accuracies[[k]])
     
-    net.2 <- integrated.all
-    net.2[rownames(net.1), colnames(net.1)] <- net.1
-    
-    accuracies[drug] <-  GetKNNAccuracy(k, net.2, data.bench)[drug]
-    print(drug)
+    cat(paste("k=", k, " accuracy:", accuracy, "\n", sep=""))
 }
 ```
 
 
-```{r}
-sum(accuracies) / length(accuracies)
-```
 
