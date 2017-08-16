@@ -44,12 +44,13 @@ source("RCode/flexible_layers/constStructureLayerFlexible.R")
 source("RCode/flexible_layers/drugTargetBenchFlexible.R")
 source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
 
+source("RCode/knn/knnCV.R")
 source("RCode/knn/knnHelpers.R")
 source("RCode/knn/drugTargetsKNN.R")
 
 source("RCode/goldenberg_imputation/medianSimilarity.R")
 
-source("notebooks/investigating_difficult_drugs/badPerformerHelpers.R")
+source("RCode/foreach_utils/foreachUtils.R")
 
 
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
@@ -119,9 +120,7 @@ sens.cor <- sens.data[common.drugs, common.drugs]
 
 pert.cor.new <- cor(pert.data.new[, intersect(common.drugs, colnames(pert.data.new))], method="pearson", use="pairwise.complete.obs")
 
-registerDoParallel(4)
-# Impute missing data
-pert.cor.new <- missForest(pert.cor.new, maxiter=10, parallelize = "variables")$ximp
+pert.cor.new <- medianSimilarity(list(pert.cor.new))[[1]]
 
 strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
 rownames(strc.cor) <- names(strc.data[common.drugs])
@@ -134,6 +133,7 @@ Impute the drugs that are missing from the perturbation layer and integrate the 
 
 ```{r}
 integrations <- list()
+loo.networks <- list()
 all.drugs <- common.drugs
 
 layer.1 <- c("sens", "pert", "strc")
@@ -151,7 +151,14 @@ for (l.1 in layer.1) {
     affinity.matrices <- medianSimilarity(augmented.matrices)
     
     integrations[[l.1]] <- affinity.matrices[[1]]
+    loo.networks[[l.1]] <- CreateLeaveOneOutNetworks(affinity.matrices[[1]], 
+                                                     temp.cor.matrices, 
+                                                     all.drugs, data.bench)
+    
 }
+```
+
+```{r}
 
 for (i in 1:length(layer.1)) {
     for (j in 1:length(layer.2)) {
@@ -167,29 +174,44 @@ for (i in 1:length(layer.1)) {
         integrated <- IntegrateCorrelationMatrices(correlation.matrices[c(l.1, l.2)], all.drugs)
         
         integrations[[paste(l.1, l.2, sep="-")]] <- integrated
+        
+        loo.networks[[paste(l.1, l.2, sep="-")]] <- CreateLeaveOneOutNetworks(integrated, 
+                                                 temp.cor.matrices, 
+                                                 all.drugs, data.bench)
     }
 }
-
-integrations[["strc-sens-pert"]] <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
-
-
 ```
+
+```{r}
+integrations[["strc-sens-pert"]] <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+loo.networks[["strc-sens-pert"]] <- CreateLeaveOneOutNetworks(integrations[["strc-sens-pert"]], correlation.matrices, all.drugs, data.bench)
+```
+
 
 ### Find Poorly Performing Drugs
 
 We first determine the neighbours of the misclassified drugs
 
 ```{r}
-k <- 10
+k <- 5
 
 mistakes <- list()
 
-for (combo in names(integrations)) {
-    temp <- GetKNNAccuracy(k, integrations[[combo]], data.bench)
+for (combo in names(loo.networks)) {
+    loo.net <- loo.networks[[combo]]
     
-    temp <- temp[temp == 0]
+    acc <- numeric(length(loo.net))
+    names(acc) <- names(loo.net)
     
-    mistakes[[combo]] <- names(temp)
+    for (drug in names(loo.net)) {
+        integrated <- loo.net[[drug]]
+        
+        acc[drug] <- GetKNNAccuracySingle(k, integrated, data.bench, drug)
+    }
+    
+    acc <- acc[acc == 0]
+    
+    mistakes[[combo]] <- names(acc)
 }
 ```
 
@@ -233,7 +255,7 @@ p <- p + xlab("Layer Combo")
 p
 ```
 
-The above graph shows us basically what we expected in terms of the model making less mistakes as more layers are added to it. It's interesting to note that the sensitivity layer on its own performs better than the sensitivity layer combined with the perturbation layer
+The above graph shows us basically what we expected in terms of the model making less mistakes as more layers are added to it. 
 
 Lastly, let's visualize the mistakes in common between the full integration and the other combos.
 
@@ -258,24 +280,6 @@ p <- p + xlab("Layer Combo")
 p
 ```
 
-
-### Find Poorly Performing Targets
-
-For each drug that was not correctly predicted according to our top 5 accuracy metric, we will add that drug's true targets to a count vector
-
-```{r, eval=F}
-bad.targets <- numeric(length(target.names))
-names(bad.targets) <- target.names
-
-for (i in bad.performers) {
-    true.targets <- data.bench$TARGET_NAME[data.bench$MOLECULE_NAME == i]
-    
-    bad.targets[true.targets] <- bad.targets[true.targets] + 1
-}
-
-bad.targets <- bad.targets[bad.targets != 0]
-```
-
 ## Experiments on Combined Drug Target Dataset
 
 ```{r}
@@ -285,21 +289,90 @@ data.bench[] <- lapply(data.bench, as.character)
 benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
 ```
 
+### Integrate Layers
+
+Impute the drugs that are missing from the perturbation layer and integrate the layers
+
+```{r}
+integrations <- list()
+loo.networks <- list()
+all.drugs <- common.drugs
+
+layer.1 <- c("sens", "pert", "strc")
+layer.2 <- c("sens", "pert", "strc")
+layer.3 <- c("sens", "pert", "strc")
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+
+for (l.1 in layer.1) {
+    temp.cor.matrices <- correlation.matrices[l.1]
+    
+    affinity.matrices <- CreateAffinityMatrices(temp.cor.matrices)
+    augmented.matrices <- CreateAugmentedMatrixSkeletons(names(temp.cor.matrices), all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, affinity.matrices)
+    affinity.matrices <- medianSimilarity(augmented.matrices)
+    
+    integrations[[l.1]] <- affinity.matrices[[1]]
+    loo.networks[[l.1]] <- CreateLeaveOneOutNetworks(affinity.matrices[[1]], 
+                                                     temp.cor.matrices, 
+                                                     all.drugs, data.bench)
+    
+}
+```
+
+```{r}
+
+for (i in 1:length(layer.1)) {
+    for (j in 1:length(layer.2)) {
+        if (j <= i) {
+            next()
+        }
+        
+        l.1 <- layer.1[i]
+        l.2 <- layer.2[j]
+        
+        temp.cor.matrices <- correlation.matrices[c(l.1, l.2)]
+            
+        integrated <- IntegrateCorrelationMatrices(correlation.matrices[c(l.1, l.2)], all.drugs)
+        
+        integrations[[paste(l.1, l.2, sep="-")]] <- integrated
+        
+        loo.networks[[paste(l.1, l.2, sep="-")]] <- CreateLeaveOneOutNetworks(integrated, 
+                                                 temp.cor.matrices, 
+                                                 all.drugs, data.bench)
+    }
+}
+```
+
+```{r}
+integrations[["strc-sens-pert"]] <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+loo.networks[["strc-sens-pert"]] <- CreateLeaveOneOutNetworks(integrations[["strc-sens-pert"]], correlation.matrices, all.drugs, data.bench)
+```
+
 ### Find Poorly Performing Drugs
 
 We first determine the neighbours of the misclassified drugs
 
 ```{r}
-k <- 10
+k <- 5
 
 mistakes <- list()
 
-for (combo in names(integrations)) {
-    temp <- GetKNNAccuracy(k, integrations[[combo]], data.bench)
+for (combo in names(loo.networks)) {
+    loo.net <- loo.networks[[combo]]
     
-    temp <- temp[temp == 0]
+    acc <- numeric(length(loo.net))
+    names(acc) <- names(loo.net)
     
-    mistakes[[combo]] <- names(temp)
+    for (drug in names(loo.net)) {
+        integrated <- loo.net[[drug]]
+        
+        acc[drug] <- GetKNNAccuracySingle(k, integrated, data.bench, drug)
+    }
+    
+    acc <- acc[acc == 0]
+    
+    mistakes[[combo]] <- names(acc)
 }
 ```
 
