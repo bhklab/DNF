@@ -1,0 +1,446 @@
+---
+
+title: "Investigate Poorly Target Performance"
+output: html_notebook
+---
+
+## Description
+
+This notebook looks at the taregets taht are misclassified when using the KNN target prediction method.
+
+## Experiments on CTRPv2 Drug Target Dataset
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+set.seed(9833)
+
+library(ggplot2)
+library(ROCR)
+library(reshape2)
+library(caret)
+library(SNFtool)
+library(org.Hs.eg.db)
+library(doParallel)
+library(foreach)
+
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/knn/knnCV.R")
+source("RCode/knn/knnHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+source("RCode/foreach_utils/foreachUtils.R")
+
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+source("notebooks/investigating_difficult_targets/difficultTargetHelpers.R")
+
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+### Load Data For Layers
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Now to load in the sensitivity correlations and the pert signatures
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+pert.data.new <- PerturbationDataFlexibleCustomSig("Data/pert_sigs_6_hour/pert_features_full.RData")
+```
+
+Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+### Find Common Drugs
+
+Notice how we aren't including the pert layer when determining the common drugs. We already know that it is missing 8 drugs, so those drugs will just be imputed later on.
+
+```{r}
+layers <- list(sens.names = sort(colnames(sens.data)), 
+               strc.names = names(strc.data))
+common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+print(length(common.drugs))
+```
+
+### Create Similarity Matrices
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+So the senstivity data is already a correlation matrix, therefore there is nothing to do there. We just need to compute the similarities for the pert layer on both the old and new signatures, as well as the structure layer.
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+
+pert.cor.new <- cor(pert.data.new[, intersect(common.drugs, colnames(pert.data.new))], method="pearson", use="pairwise.complete.obs")
+
+pert.cor.new <- medianSimilarity(list(pert.cor.new))[[1]]
+
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
+rownames(strc.cor) <- names(strc.data[common.drugs])
+colnames(strc.cor) <- names(strc.data[common.drugs])
+```
+
+### Integrate Layers
+
+Impute the drugs that are missing from the perturbation layer and integrate the layers
+
+```{r}
+integrations <- list()
+loo.networks <- list()
+all.drugs <- common.drugs
+
+layer.1 <- c("sens", "pert", "strc")
+layer.2 <- c("sens", "pert", "strc")
+layer.3 <- c("sens", "pert", "strc")
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+
+for (l.1 in layer.1) {
+    temp.cor.matrices <- correlation.matrices[l.1]
+    
+    affinity.matrices <- CreateAffinityMatrices(temp.cor.matrices)
+    augmented.matrices <- CreateAugmentedMatrixSkeletons(names(temp.cor.matrices), all.drugs)
+    augmented.matrices <- ReplaceAugmentedExistingValues(augmented.matrices, affinity.matrices)
+    affinity.matrices <- medianSimilarity(augmented.matrices)
+    
+    integrations[[l.1]] <- affinity.matrices[[1]]
+    loo.networks[[l.1]] <- CreateLeaveOneOutNetworks(affinity.matrices[[1]],
+                                              temp.cor.matrices,
+                                              all.drugs,
+                                              data.bench)
+}
+```
+
+```{r}
+for (i in 1:length(layer.1)) {
+    for (j in 1:length(layer.2)) {
+        if (j <= i) {
+            next()
+        }
+        
+        l.1 <- layer.1[i]
+        l.2 <- layer.2[j]
+        
+        temp.cor.matrices <- correlation.matrices[c(l.1, l.2)]
+            
+        integrated <- IntegrateCorrelationMatrices(correlation.matrices[c(l.1, l.2)], all.drugs)
+        
+        integrations[[paste(l.1, l.2, sep="-")]] <- integrated
+        loo.networks[[paste(l.1, l.2, sep="-")]] <- CreateLeaveOneOutNetworks(integrated,
+                                                                              temp.cor.matrices,
+                                                                              all.drugs,
+                                                                              data.bench)
+    }
+}
+```
+
+```{r}
+
+integrations[["strc-sens-pert"]] <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+loo.networks[["strc-sens-pert"]] <- CreateLeaveOneOutNetworks(integrations[["strc-sens-pert"]],
+                                                              correlation.matrices,
+                                                              all.drugs,
+                                                              data.bench)
+
+
+```
+
+### Find Poorly Performing Targets
+
+We first start with the most coarse grained approach we can think of which means that if even a single target for a given drug was predicted correctly, all the other targets for that drug get lumped in a being predicted correctly as well.
+
+For now we stick to the standard top 5 definition, but it would be wise to also analyze our more liberal definition of top 5 later on as well.
+
+One thing we need to be aware of is that some targets just appear more in the combined drug target dataset, so simply counting how many times a given target gets classified correctly is not enough. This needs to be divided by the number of times that the target appears
+
+```{r}
+k <- 5
+top <- 5
+drugs.with.targets <- sort(unique(data.bench$MOLECULE_NAME))
+```
+
+For every network layer combo, we get the bad targets and the corresponding misclassifications made so that we can do some plotting with these later on.
+
+```{r}
+target.performance <- list()
+target.misclassifications <- list()
+
+for (network in names(loo.networks)) {
+    for (drug in drugs.with.targets) {
+        loo.net <- loo.networks[[network]][[drug]][drugs.with.targets, drugs.with.targets]
+        temp <- GetNearestNeighbours(k, loo.net, drug)    
+        
+        neighbours <- temp$neighbours
+        weights <- temp$weights
+        
+        counts <- CountTargetsFromNeighbours(neighbours, weights, data.bench)
+        top.predictions <- GetTopPredictions(counts, top)
+        
+        temp.bad.targets <- GetTargetPerformance(top.predictions, data.bench)
+        temp.misclassifications <- GetMisclassifiedDrugsPerTarget(top.predictions, data.bench)
+        
+        target.performance[[network]] <- MergeTargets(target.performance[[network]], temp.bad.targets)
+        target.misclassifications[[network]] <- MergeMisclassifications(target.misclassifications[[network]], temp.misclassifications)
+    }
+}
+```
+
+```{r}
+bad.targets <- list()
+all.target.names <- sort(unique(data.bench$TARGET_NAME))
+target.appearances <- numeric(length(all.target.names))
+names(target.appearances) <- all.target.names
+
+for (target in all.target.names) {
+    count <- length(data.bench$MOLECULE_NAME[data.bench$TARGET_NAME == target])
+    
+    target.appearances[target] <- count
+}
+
+for (network in names(target.performance)) {
+    temp <- target.performance[[network]][all.target.names] / target.appearances
+    bad.targets[[network]] <- temp[temp < 1]
+}
+```
+
+
+### Plot Number of Poorly Performing Targets Per Network
+
+```{r}
+df.data <- CreateDataForBadTargetsPlot(bad.targets)
+
+p <- ggplot(data=df.data, aes(x=reorder(network, -counts), y=counts))
+p <- p + geom_bar(stat="identity", aes(fill=as.factor(network)))
+p <- p + geom_text(aes(label=counts), vjust=1.6, color="white")
+p <- p + ggtitle("Bad Targets Per Layer Combo")
+p <- p + xlab("Layer Combo")
+p
+```
+
+### Plot Number of Poorly Performing Targets In Common With Full Network
+
+```{r}
+fully.integrated <- bad.targets$`strc-sens-pert`
+
+df.data <- lapply(bad.targets[-length(bad.targets)], function(x) {
+    length(intersect(names(x), names(fully.integrated)))
+})
+
+df.data <- unlist(df.data)
+df.data <- cbind(names(df.data), df.data)
+colnames(df.data) <- c("layer.combo", "bad.targets.in.common")
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+df.data[, 2] <- as.numeric(df.data[, 2])
+
+p <- ggplot(data=df.data, aes(x=reorder(layer.combo, bad.targets.in.common, FUN = function(x) - x), y=bad.targets.in.common))
+p <- p + geom_bar(aes(fill=as.factor(layer.combo)), stat="identity")
+p <- p + geom_text(aes(label=bad.targets.in.common), vjust=1.6, color="white")
+p <- p + ggtitle("Bad Targets In Common Between Full Network And Other Combos")
+p <- p + xlab("Layer Combo")
+p
+```
+
+We can now create a plot showing the number of misclassified drugs for each bad target.
+
+```{r, fig.height=9, fig.width=8}
+full.network.misclassifications <- lapply(target.misclassifications$`strc-sens-pert`, function(x) {
+    unlist(x)
+})
+
+df.data <- data.frame(target=character(), drug=character(), stringsAsFactors = F)
+
+for (target in names(full.network.misclassifications)) {
+    t <- rep(target, length(full.network.misclassifications[[target]]))
+    d <- full.network.misclassifications[[target]]
+    
+    temp <- cbind(t, d)
+    df.data <- rbind(df.data, temp)
+}
+
+colnames(df.data) <- c("target", "drug")
+
+df.data$count <- NA
+
+for (target in unique(df.data$target)) {
+    count <- nrow(df.data[df.data$target == target, ])
+    
+    df.data[df.data$target == target, "count"] <- count
+}
+
+df.data <- df.data[df.data$count > 1, ]
+
+p <- ggplot()
+
+for (target in unique(df.data$target)) {
+    df.sub <- df.data[df.data$target == target, ]
+    
+    p <- p + geom_bar(data=df.sub, aes(x=target), stat="count")
+    p <- p + geom_text(data=df.sub, aes(x=target, label=paste(drug, collapse=", "), y=count / 2), stat="identity", color="white", angle=90)
+}
+
+p
+```
+
+As a final analysis for the CTRPv2 dataset, let's see how the misclassified targets change as we use different combinations of layers in our network.
+
+
+## Experiments on Combined Drug Target Dataset
+
+First, we load in the combined drug targe dataset.
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=TRUE, use.chembl=TRUE, use.dbank=TRUE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+Then, we just rerun the previous plotting code over again.
+
+```{r}
+k <- 5
+top <- 5
+drugs.with.targets <- sort(unique(data.bench$MOLECULE_NAME))
+```
+
+For every network layer combo, we need to create the corresponding leave-one-out network equivalents.
+*** Warning, this part is not properly creating the leave one out networks for some reason.
+```{r}
+loo.networks <- list()
+
+for (network in names(integrations)) {
+    integrated <- integrations[[network]]
+    cor.indices <- unlist(strsplit(network, "-"))
+    temp.cor.matrices <- correlation.matrices[cor.indices]
+    
+    loo.networks[[network]] <- CreateLeaveOneOutNetworks(integrated, temp.cor.matrices, all.drugs, data.bench)
+}
+```
+
+Now we can actually determine the performance of the various layer combos by quantifying target performance and seeing how many bad targets there are per layer.
+
+```{r}
+target.performance <- list()
+target.misclassifications <- list()
+
+for (network in names(loo.networks)) {
+    for (drug in drugs.with.targets) {
+        loo.net <- loo.networks[[network]][[drug]][drugs.with.targets, drugs.with.targets]
+        temp <- GetNearestNeighbours(k, loo.net, drug)    
+        
+        neighbours <- temp$neighbours
+        weights <- temp$weights
+        
+        counts <- CountTargetsFromNeighbours(neighbours, weights, data.bench)
+        top.predictions <- GetTopPredictions(counts, top)
+        
+        temp.bad.targets <- GetTargetPerformance(top.predictions, data.bench)
+        temp.misclassifications <- GetMisclassifiedDrugsPerTarget(top.predictions, data.bench)
+        
+        target.performance[[network]] <- MergeTargets(target.performance[[network]], temp.bad.targets)
+        target.misclassifications[[network]] <- MergeMisclassifications(target.misclassifications[[network]], temp.misclassifications)
+    }
+}
+```
+
+```{r}
+bad.targets <- list()
+all.target.names <- sort(unique(data.bench$TARGET_NAME))
+target.appearances <- numeric(length(all.target.names))
+names(target.appearances) <- all.target.names
+
+for (target in all.target.names) {
+    count <- length(data.bench$MOLECULE_NAME[data.bench$TARGET_NAME == target])
+    
+    target.appearances[target] <- count
+}
+
+for (network in names(target.performance)) {
+    temp <- target.performance[[network]][all.target.names] / target.appearances
+    bad.targets[[network]] <- temp[temp < 1]
+}
+```
+
+
+### Plot Number of Poorly Performing Targets Per Network
+
+```{r}
+df.data <- CreateDataForBadTargetsPlot(bad.targets)
+
+p <- ggplot(data=df.data, aes(x=reorder(network, -counts), y=counts))
+p <- p + geom_bar(stat="identity", aes(fill=as.factor(network)))
+p <- p + geom_text(aes(label=counts), vjust=1.6, color="white")
+p <- p + ggtitle("Bad Targets Per Layer Combo")
+p <- p + xlab("Layer Combo")
+p
+```
+
+### Plot Number of Poorly Performing Targets In Common With Full Network
+
+```{r}
+fully.integrated <- bad.targets$`strc-sens-pert`
+
+df.data <- lapply(bad.targets[-length(bad.targets)], function(x) {
+    length(intersect(names(x), names(fully.integrated)))
+})
+
+df.data <- unlist(df.data)
+df.data <- cbind(names(df.data), df.data)
+colnames(df.data) <- c("layer.combo", "bad.targets.in.common")
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+df.data[, 2] <- as.numeric(df.data[, 2])
+
+p <- ggplot(data=df.data, aes(x=reorder(layer.combo, bad.targets.in.common, FUN = function(x) - x), y=bad.targets.in.common))
+p <- p + geom_bar(aes(fill=as.factor(layer.combo)), stat="identity")
+p <- p + geom_text(aes(label=bad.targets.in.common), vjust=1.6, color="white")
+p <- p + ggtitle("Bad Targets In Common Between Full Network And Other Combos")
+p <- p + xlab("Layer Combo")
+p
+```

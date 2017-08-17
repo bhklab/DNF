@@ -1,0 +1,284 @@
+---
+title: "KNN Multiple Target Prediction"
+output: html_notebook
+---
+
+## Description
+
+The goal of this notebook is to take a look at KNN performance in a bit more detail by considering the task of predicting not just a single target per drug, but multiple targets. Doing so gives us the ability to give credit only to the targets that were retrieved by the model.
+
+## Experiments on CTRPv2 Drug Target Dataset
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+set.seed(9833)
+
+library(ggplot2)
+library(ROCR)
+library(reshape2)
+library(caret)
+library(SNFtool)
+library(org.Hs.eg.db)
+library(doParallel)
+library(foreach)
+
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/knn/knnCV.R")
+source("RCode/knn/knnHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+source("notebooks/investigating_difficult_targets/difficultTargetHelpers.R")
+
+source("RCode/foreach_utils/foreachUtils.R")
+
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+### Load Data For Layers
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Now to load in the sensitivity correlations and the pert signatures
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+pert.data.new <- PerturbationDataFlexibleCustomSig("Data/pert_sigs_6_hour/pert_features_full.RData")
+```
+
+Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+### Find Common Drugs
+
+Notice how we aren't including the pert layer when determining the common drugs. We already know that it is missing 8 drugs, so those drugs will just be imputed later on.
+
+```{r}
+layers <- list(sens.names = sort(colnames(sens.data)), 
+               strc.names = names(strc.data))
+common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+print(length(common.drugs))
+```
+
+### Create Similarity Matrices
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+So the senstivity data is already a correlation matrix, therefore there is nothing to do there. We just need to compute the similarities for the pert layer on both the old and new signatures, as well as the structure layer.
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+
+pert.cor.new <- cor(pert.data.new[, intersect(common.drugs, colnames(pert.data.new))], method="pearson", use="pairwise.complete.obs")
+
+pert.cor.new <- medianSimilarity(list(pert.cor.new))[[1]]
+
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
+rownames(strc.cor) <- names(strc.data[common.drugs])
+colnames(strc.cor) <- names(strc.data[common.drugs])
+```
+
+### Integrate Network
+
+```{r}
+all.drugs <- common.drugs
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+
+integrated <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+```
+
+```{r}
+loo.networks <- CreateLeaveOneOutNetworks(integrated, correlation.matrices, all.drugs, data.bench)
+```
+
+### Evaluate KNN Sensitivity and Specificity
+
+For each drug, we figure out the targets that were correctly and incorrectly predicted so that we can evaluate sensitivity and specificity
+
+```{r}
+k <- 5
+top <- 5
+
+drugs.with.targets <- sort(unique(data.bench$MOLECULE_NAME))
+target.names <- sort(unique(data.bench$TARGET_NAME))
+
+false.positives <- numeric(length(target.names))
+names(false.positives) <- target.names
+
+false.negatives <- numeric(length(target.names))
+names(false.negatives) <- target.names
+
+true.positives <- numeric(length(target.names))
+names(true.positives) <- target.names
+
+true.negatives <- numeric(length(target.names))
+names(true.negatives) <- target.names
+
+for (drug in names(loo.networks)) {
+    network <- loo.networks[[drug]]
+    network <- network[drugs.with.targets, drugs.with.targets]
+
+    temp <- GetNearestNeighbours(k, integrated, drug)    
+    neighbours <- temp$neighbours
+    weights <- temp$weights
+    
+    counts <- CountTargetsFromNeighbours(neighbours, weights, data.bench)
+    top.predictions <- GetTopPredictions(counts, top)
+    
+    true.targets <- data.bench$TARGET_NAME[data.bench$MOLECULE_NAME == drug]
+    predicted.targets <- names(top.predictions[[1]])
+    
+    for (target in true.targets) {
+        if (target %in% predicted.targets) {
+            true.positives[target] <- true.positives[target] + 1
+        } else {
+            false.negatives[target] <- false.negatives[target] + 1
+        }
+    }
+    
+    for (target in predicted.targets) {
+        if (!(target %in% true.targets)) {
+            false.positives[target] <- false.positives[target] + 1
+        }
+    }
+    
+    true.negatives[!(names(true.negatives) %in% true.targets)] <- true.negatives[!(names(true.negatives) %in% true.targets)] + 1
+}
+```
+
+```{r}
+total.target.count <- nrow(data.bench)
+target.sensitivity <- sum(true.positives) / (sum(true.positives) + sum(false.negatives))
+
+target.specificity <- sum(true.negatives) / (sum(true.negatives) + sum(false.positives))
+
+ppv <- sum(true.positives) / (sum(true.positives) + sum(false.positives))
+
+cat(paste("Sensitivity:", target.sensitivity, " Specificity:", target.specificity,sep=""))
+```
+
+### Evaluate KNN Sensitivity and Specificity At Drug Level
+
+Let's calculate the sensitivity and specificity for each drug and then do a weighted average based on the number of targets per drug
+
+```{r}
+k <- 5
+top <- 5 
+
+drug.names <- sort(unique(data.bench$MOLECULE_NAME))
+sensitivities <- numeric(length(drug.names))
+names(sensitivities) <- drug.names
+
+specificities <- numeric(length(drug.names))
+names(specificities) <- drug.names
+
+for (drug in drug.names) {
+    network <- loo.networks[[drug]]
+    network <- network[drugs.with.targets, drugs.with.targets]
+
+    temp <- GetNearestNeighbours(k, integrated, drug)    
+    neighbours <- temp$neighbours
+    weights <- temp$weights
+    
+    counts <- CountTargetsFromNeighbours(neighbours, weights, data.bench)
+    top.predictions <- GetTopPredictions(counts, top)
+    
+    true.targets <- data.bench$TARGET_NAME[data.bench$MOLECULE_NAME == drug]
+    predicted.targets <- names(top.predictions[[1]])
+
+    true.positives <- numeric(length(target.names))
+    names(true.positives) <- target.names
+    
+    true.negatives <- numeric(length(target.names))
+    names(true.negatives) <- target.names
+    
+    false.negatives <- numeric(length(target.names))
+    names(false.negatives) <- target.names
+    
+    false.positives <- numeric(length(target.names))
+    names(false.positives) <- target.names
+    
+    for (target in true.targets) {
+        if (target %in% predicted.targets) {
+            true.positives[target] <- true.positives[target] + 1
+        } else {
+            false.negatives[target] <- false.negatives[target] + 1
+        }
+    }
+    
+    for (target in predicted.targets) {
+        if (!(target %in% true.targets)) {
+            false.positives[target] <- false.positives[target] + 1
+        }
+    }
+    
+    true.negatives[!(names(true.negatives) %in% predicted.targets)] <- true.negatives[!(names(true.negatives) %in% predicted.targets)] + 1
+    
+    sensitivities[drug] <- sum(true.positives) / (sum(true.positives) + sum(false.negatives))
+    specificities[drug] <- sum(true.negatives) / (sum(true.negatives) + sum(false.positives))
+}
+```
+
+```{r}
+weights <- sapply(sort(unique(data.bench$MOLECULE_NAME)), function(x, data.bench) {
+    nrow(data.bench[data.bench$MOLECULE_NAME == x,])
+}, data.bench=data.bench)
+```
+
+```{r}
+sensitivity <- weighted.mean(sensitivities, weights)
+specificity <- weighted.mean(specificities, weights)
+
+cat(paste("Sensitivity:", sensitivity, " Specificity:", specificity, sep=""))
+```
+
+
+
