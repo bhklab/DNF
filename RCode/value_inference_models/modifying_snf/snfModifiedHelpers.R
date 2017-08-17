@@ -175,9 +175,13 @@ IntegrateCorrelationMatrices <- function(correlation.matrices, all.drugs) {
     # Any remaining NAs simply get replaced via median value imputation
     affinity.matrices <- medianSimilarity(affinity.matrices)
     
-    integrated <- SNFtool::SNF(affinity.matrices)
-    rownames(integrated) <- all.drugs
-    colnames(integrated) <- all.drugs
-    
+    if (length(affinity.matrices) > 1) {
+        integrated <- SNFtool::SNF(affinity.matrices)
+        rownames(integrated) <- all.drugs
+        colnames(integrated) <- all.drugs
+    } else {
+        integrated <- affinity.matrices[[1]]
+    }
+
     return(integrated)
 }

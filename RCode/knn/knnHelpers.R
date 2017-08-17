@@ -19,6 +19,10 @@ GetKNNAccuracy <- function(k, integrated, data.bench, scale.distance=FALSE, extr
 GetNearestNeighbours <- function(k, integrated, drugs) {
     drugs.with.targets <- rownames(integrated)
     
+    if (k == ncol(integrated)) {
+        k <- k - 1
+    }
+    
     # Neighbours is a a matirx of the shape NUM_DRUGS X K. 
     # For example, a row looks like: Drug X     34 21 ... 10 4.
     neighbours <- matrix(0, nrow=length(drugs), ncol=k)
@@ -39,12 +43,12 @@ GetNearestNeighbours <- function(k, integrated, drugs) {
         res <- sapply(sort(row, index.return=TRUE, decreasing=T), '[')
         res.indices <- res[, "ix"]
         res.weights <- res[, 'x']
-
-        res.indices <- res.indices[2:(k+1)]
-        res.weights <- res.weights[2:(k+1)]
         
-        res.indices <- rev(res.indices)
-        res.weights <- rev(res.weights)
+        res.indices <- res.indices[!(names(res.indices) %in% drug.name)]
+        res.weights <- res.weights[!(names(res.weights) %in% drug.name)]
+
+        res.indices <- res.indices[1:(min(k, length(res.indices)))]
+        res.weights <- res.weights[1:(min(k, length(res.weights)))]
 
         neighbours[i, ] <- res.indices
         weights[i, ] <- res.weights
