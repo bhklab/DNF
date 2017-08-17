@@ -1,0 +1,400 @@
+---
+title: "Investigating Neighbour Rank Change"
+output: html_notebook
+---
+
+## Description
+
+The purpose of this notebook is to look at how nearest neighbours change for various layer combinations. We can quantify this by the mean rank change across drugs. 
+
+Since we aren't evaluating KNN accuracy, there is no need to do the LOOCV that is common in other notebooks.
+
+```{r setup}
+knitr::opts_knit$set(root.dir=normalizePath("../../"))
+```
+
+## Experiments on CTRPv2 Drug Target Dataset
+
+### Load Data
+
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+set.seed(9833)
+
+library(ggplot2)
+library(ROCR)
+library(reshape2)
+library(caret)
+library(SNFtool)
+library(org.Hs.eg.db)
+library(doParallel)
+library(missForest)
+
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/knn/knnHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+
+source("notebooks/investigating_difficult_drugs/rankChangeHelpers.R")
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Now to load in the sensitivity correlations and the pert signatures
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+pert.data.new <- PerturbationDataFlexibleCustomSig("Data/pert_sigs_6_hour/pert_features_full.RData")
+```
+
+Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+### Find Common Drugs
+
+Notice how we aren't including the pert layer when determining the common drugs. We already know that it is missing 8 drugs, so those drugs will just be imputed later on.
+
+```{r}
+layers <- list(sens.names = sort(colnames(sens.data)), 
+               strc.names = names(strc.data))
+common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+print(length(common.drugs))
+```
+
+### Create Similarity Matrices
+
+So the senstivity data is already a correlation matrix, therefore there is nothing to do there. We just need to compute the similarities for the pert layer on both the old and new signatures, as well as the structure layer.
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+
+pert.cor.new <- cor(pert.data.new[, intersect(common.drugs, colnames(pert.data.new))], method="pearson", use="pairwise.complete.obs")
+
+pert.cor.new <- medianSimilarity(list(pert.cor.new))[[1]]
+
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
+rownames(strc.cor) <- names(strc.data[common.drugs])
+colnames(strc.cor) <- names(strc.data[common.drugs])
+```
+
+
+### Rank Changes on Entire Networks (no subsetting to benchmark drugs)
+
+#### Integrate Layers
+
+Impute the drugs that are missing from the perturbation layer and integrate the layers
+
+```{r}
+integrations <- list()
+all.drugs <- common.drugs
+
+layer.1 <- c("sens", "pert", "strc")
+layer.2 <- c("sens", "pert", "strc")
+layer.3 <- c("sens", "pert", "strc")
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+
+for (l.1 in layer.1) {
+    temp.cor.matrices <- correlation.matrices[l.1]
+    
+    integrations[[l.1]] <- IntegrateCorrelationMatrices(temp.cor.matrices, all.drugs)
+    
+}
+```
+
+```{r}
+
+for (i in 1:length(layer.1)) {
+    for (j in 1:length(layer.2)) {
+        if (j <= i) {
+            next()
+        }
+        
+        l.1 <- layer.1[i]
+        l.2 <- layer.2[j]
+        
+        temp.cor.matrices <- correlation.matrices[c(l.1, l.2)]
+            
+        integrated <- IntegrateCorrelationMatrices(correlation.matrices[c(l.1, l.2)], all.drugs)
+        
+        integrations[[paste(l.1, l.2, sep="-")]] <- integrated
+    }
+}
+```
+
+```{r}
+integrations[["strc-sens-pert"]] <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+```
+
+#### Get Nearest Neighbours For Each Layer
+
+```{r}
+k <- length(all.drugs)
+neighbours <- list()
+
+for (network in names(integrations)) {
+    integrated <- integrations[[network]]
+    
+    neighbours[[network]] <- GetNearestNeighbours(k, integrated, all.drugs)
+}
+
+weights <- lapply(neighbours, function(x) {
+    x$weights
+    
+})
+
+neighbours <- lapply(neighbours, function(x) {
+    x$neighbours
+})
+```
+
+#### Determine Rank Changes Between Layers
+
+Below we calculate the average rank change between pairs of layer combos. This gives us an idea of how much the ordering of neighbours changes based on what layers are used in the integration.
+
+We also calculate the rank changes for just the top 5 neighbours. This is the more interesting statistic since these are the neighbours responsible for the KNN accuracy.
+
+```{r}
+rank.changes.full <- list()
+rank.changes.top.5 <- list()
+
+for (i in 1:(length(neighbours) - 1)) {
+    net.1 <- names(neighbours)[i]
+    
+    for (j in (i + 1):length(neighbours)) {
+        net.2 <- names(neighbours)[j]
+        
+        rank.changes.full[[paste(net.1, net.2, sep="|")]] <- CalculateRankChanges(neighbours[[i]],
+                                                                             neighbours[[j]])
+        rank.changes.top.5[[paste(net.1, net.2, sep="|")]] <- CalculateRankChangesSpecific(neighbours[[i]], neighbours[[j]], 5)
+    }
+}
+```
+
+##### Full Rank Changes
+
+```{r, fig.width=12}
+positive.changes <- unlist(lapply(rank.changes.full, function(x) {
+    x$mean.positive.change
+}))
+
+negative.changes <- unlist(lapply(rank.changes.full, function(x) {
+    x$mean.negative.change
+}))
+
+positive.changes <- positive.changes[1:10]
+negative.changes <- negative.changes[1:10]
+
+
+df.data.full <- cbind(rep("positive", length(positive.changes)), positive.changes, names(positive.changes))
+df.data.full <- rbind(df.data.full, cbind(rep("negative", length(negative.changes)), negative.changes, names(negative.changes)))
+colnames(df.data.full) <- c("direction", "delta", "pair")
+temp <- as.numeric(df.data.full[, "delta"])
+
+df.data.full <- as.data.frame(df.data.full)
+df.data.full$delta <- temp
+
+
+p <- ggplot(data=df.data.full, aes(x=pair, y=delta))
+p <- p + geom_bar(stat="identity", aes(fill=direction), position="dodge")
+p <- p + ggtitle("Mean Drug Neighbour Rank Difference Between Layer Combo Pairs")
+p
+```
+
+##### Top 5 Rank Changes
+
+```{r, fig.width=12}
+positive.changes <- unlist(lapply(rank.changes.top.5, function(x) {
+    x$mean.positive.change
+}))
+
+negative.changes <- unlist(lapply(rank.changes.top.5, function(x) {
+    x$mean.negative.change
+}))
+
+positive.changes <- positive.changes[1:10]
+negative.changes <- negative.changes[1:10]
+
+
+df.data.full <- cbind(rep("positive", length(positive.changes)), positive.changes, names(positive.changes))
+df.data.full <- rbind(df.data.full, cbind(rep("negative", length(negative.changes)), negative.changes, names(negative.changes)))
+colnames(df.data.full) <- c("direction", "delta", "pair")
+temp <- as.numeric(df.data.full[, "delta"])
+
+df.data.full <- as.data.frame(df.data.full)
+df.data.full$delta <- temp
+
+
+p <- ggplot(data=df.data.full, aes(x=pair, y=delta))
+p <- p + geom_bar(stat="identity", aes(fill=direction), position="dodge")
+p <- p + ggtitle("Mean Drug Neighbour Rank Difference Between Layer Combo Pairs")
+p
+```
+
+
+
+### Rank Changes on Benchmark Subsetted Networks
+
+#### Get Drug Target Info
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+#### Get Nearest Neighbours For Each Layer Combo
+
+Now that we have the drug target info available, let's see what happens when we subset our network to only the drugs that have target info.
+
+```{r}
+integrations.subsetted <- lapply(integrations, function(x) {
+    x[benchmark.drugs, benchmark.drugs]
+})
+```
+
+
+#### Get Nearest Neighbours For Each Layer
+
+```{r}
+k <- length(benchmark.drugs)
+neighbours <- list()
+
+for (network in names(integrations.subsetted)) {
+    integrated <- integrations.subsetted[[network]]
+    
+    neighbours[[network]] <- GetNearestNeighbours(k, integrated, benchmark.drugs)
+}
+
+weights <- lapply(neighbours, function(x) {
+    x$weights
+})
+
+neighbours <- lapply(neighbours, function(x) {
+    x$neighbours
+})
+```
+
+#### Determine Rank Changes Between Layers
+
+Below we calculate the average rank change between pairs of layer combos. This gives us an idea of how much the ordering of neighbours changes based on what layers are used in the integration.
+
+```{r}
+rank.changes.full <- list()
+rank.changes.top.5 <- list()
+
+for (i in 1:(length(neighbours) - 1)) {
+    net.1 <- names(neighbours)[i]
+    
+    for (j in (i + 1):length(neighbours)) {
+        net.2 <- names(neighbours)[j]
+        
+        rank.changes.full[[paste(net.1, net.2, sep="|")]] <- CalculateRankChanges(neighbours[[i]],
+                                                                             neighbours[[j]])
+        rank.changes.top.5[[paste(net.1, net.2, sep="|")]] <- CalculateRankChangesSpecific(neighbours[[i]], neighbours[[j]], 5)
+    }
+}
+```
+
+##### Full Rank Changes
+
+```{r, fig.width=12}
+positive.changes <- unlist(lapply(rank.changes.full, function(x) {
+    x$mean.positive.change
+}))
+
+negative.changes <- unlist(lapply(rank.changes.full, function(x) {
+    x$mean.negative.change
+}))
+
+positive.changes <- positive.changes[1:10]
+negative.changes <- negative.changes[1:10]
+
+
+df.data.full <- cbind(rep("positive", length(positive.changes)), positive.changes, names(positive.changes))
+df.data.full <- rbind(df.data.full, cbind(rep("negative", length(negative.changes)), negative.changes, names(negative.changes)))
+colnames(df.data.full) <- c("direction", "delta", "pair")
+temp <- as.numeric(df.data.full[, "delta"])
+
+df.data.full <- as.data.frame(df.data.full)
+df.data.full$delta <- temp
+
+
+p <- ggplot(data=df.data.full, aes(x=pair, y=delta))
+p <- p + geom_bar(stat="identity", aes(fill=direction), position="dodge")
+p <- p + ggtitle("Mean Drug Neighbour Rank Difference Between Layer Combo Pairs")
+p
+```
+
+##### Top 5 Rank Changes
+
+```{r, fig.width=12}
+positive.changes <- unlist(lapply(rank.changes.top.5, function(x) {
+    x$mean.positive.change
+}))
+
+negative.changes <- unlist(lapply(rank.changes.top.5, function(x) {
+    x$mean.negative.change
+}))
+
+positive.changes <- positive.changes[1:10]
+negative.changes <- negative.changes[1:10]
+
+
+df.data.full <- cbind(rep("positive", length(positive.changes)), positive.changes, names(positive.changes))
+df.data.full <- rbind(df.data.full, cbind(rep("negative", length(negative.changes)), negative.changes, names(negative.changes)))
+colnames(df.data.full) <- c("direction", "delta", "pair")
+temp <- as.numeric(df.data.full[, "delta"])
+
+df.data.full <- as.data.frame(df.data.full)
+df.data.full$delta <- temp
+
+
+p <- ggplot(data=df.data.full, aes(x=pair, y=delta))
+p <- p + geom_bar(stat="identity", aes(fill=direction), position="dodge")
+p <- p + ggtitle("Mean Drug Neighbour Rank Difference Between Layer Combo Pairs")
+p
+```
+
