@@ -398,3 +398,43 @@ p <- p + ggtitle("Mean Drug Neighbour Rank Difference Between Layer Combo Pairs"
 p
 ```
 
+### Overlap on Benchmark Subsetted Networks
+
+Now that we've seen rank changes, let's see how the overlap in the top number of neighbours varies as we increase the neighbours by simply taking the intersection. This is a monotonically increasing quantity since there is no way that the total number of overlapping neighbours between layer combinations will decrease as we consider more neighbours. However, if we plot the overlap as a percentage and not a total number, that might not increase monotonically.
+
+```{r}
+overlap.means <- list()
+
+for (i in 1:(length(neighbours) - 1)) {
+    net.1 <- names(neighbours)[i]
+    
+    for (j in (i + 1):length(neighbours)) {
+        net.2 <- names(neighbours)[j]
+        
+        overlap.means[[paste(net.1, net.2, sep="|")]] <- CalculateNeighbourIntersection(neighbours[[i]], neighbours[[j]])$overlap.percentage.mean
+    }
+}
+```
+
+```{r}
+df.data <- matrix(ncol=3)
+for (pair in names(overlap.means)) {
+    temp <- rep(pair, length(overlap.means[[pair]]))
+    
+    df.data <- rbind(df.data ,cbind(temp, overlap.means[[pair]], 1:length(overlap.means[[pair]])))
+}
+
+df.data <- df.data[-1, ]
+temp <- as.numeric(df.data[, 2])
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+df.data[, 2] <- temp
+df.data[, 3] <- as.numeric(df.data[, 3])
+colnames(df.data) <- c("pair", "overlap","k")
+
+p <- ggplot(df.data, aes(x=k, y=overlap))
+p <- p + geom_line(aes(color=pair))
+p <- p + ggtitle("Percentage Overlap of Neighbours As K Increases")
+ggplotly(p)
+```
+
+

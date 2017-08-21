@@ -1,0 +1,395 @@
+---
+title: "KNN With Uncertainty Information"
+output: html_notebook
+---
+
+## Description
+
+The final issue with the KNN method as it stands is that it throws away information regarding neighbours that don't have target information. Thus, the nearest neighbours obtained for a given drug of interest are not necessarily the nearest neighbours, but rather the ones that have drug target info available.
+
+In this notebook we see what would happen if we consider also the neighbours that don't have drug target info available. Obviously this will be pretty much useless from the perspective of predicting targets since those neighbours don't have any targets to contribute, but it's possible that including uncertainty information could be of help to the user, and it could help explain why we are predicting some drugs incorrectly. I.e. if the true top 5 nearest neighbours of a given drug do not have drug target info, we used to ignore these drugs altogether and move on to drugs that do have target info. However, this is misleading since the so-called neighbours that we get the targets from might actually be quite far away.
+
+```{r setup}
+knitr::opts_knit$set(root.dir = normalizePath("../../"))
+```
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+set.seed(9833)
+
+library(plotly)
+library(ggplot2)
+library(ROCR)
+library(reshape2)
+library(caret)
+library(SNFtool)
+library(org.Hs.eg.db)
+library(doParallel)
+library(foreach)
+
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexible.R")
+source("RCode/flexible_layers/perturbationDataFlexibleCustomSig.R")
+source("RCode/flexible_layers/structureDataFlexible.R")
+source("RCode/flexible_layers/imagingDataFlexible.R")
+
+source("RCode/flexible_layers/constImagingLayerFlexible.R")
+source("RCode/flexible_layers/constSensitivityLayerFlexible.R")
+source("RCode/flexible_layers/constPerturbationLayerFlexible.R")
+source("RCode/flexible_layers/constStructureLayerFlexible.R")
+
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+
+source("RCode/knn/knnHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+source("RCode/goldenberg_imputation/medianSimilarity.R")
+
+source("notebooks/investigating_knn_performance/targetPositionDistributionHelpers.R")
+
+source("RCode/knn/knnCV.R")
+source("RCode/foreach_utils/foreachUtils.R")
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+## Experiments on CTRPv2 Drug Target Data
+
+### Load Data For Layers
+
+We start by loading in the lincs metadata file which is used to match senstivity drug names to the l1000 signatures since are indexed according to pert_id instead of pert_iname. It also contains the smiles strings for all the compounds in L1000, and these are used to create the structure layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Now to load in the sensitivity correlations and the pert signatures
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+pert.data.new <- PerturbationDataFlexibleCustomSig("Data/pert_sigs_6_hour/pert_features_full.RData")
+```
+
+Keep in mind that the new signatures are missing 8 drugs since they were computed on only 9 cell lines. Thus, when we compute the common drugs later, they should be based on the intersection between sens and the new pert signatures.
+
+Subset the lincs metadata file to only the drugs appearing in the sensitivity layer
+
+```{r}
+sens.names <- rownames(sens.data)
+
+lincs.meta.subset <- lincs.meta[match(sens.names, lincs.meta$pert_iname),]
+lincs.meta.subset <- lincs.meta.subset[!is.na(lincs.meta.subset$X),]
+```
+
+
+Now we create the structure fingerprints based on the subsetted lincs metadata
+
+```{r}
+strc.data <- StructureDataFlexible(lincs.meta.subset)  ## a vector  --> 239 elemnts
+```
+
+### Find Common Drugs
+
+Notice how we aren't including the pert layer when determining the common drugs. We already know that it is missing 8 drugs, so those drugs will just be imputed later on.
+
+```{r}
+layers <- list(sens.names = sort(colnames(sens.data)), 
+               strc.names = names(strc.data))
+common.drugs <- Reduce(intersect, Filter(Negate(is.null),layers))
+print(length(common.drugs))
+```
+
+### Create Similarity Matrices
+
+So the senstivity data is already a correlation matrix, therefore there is nothing to do there. We just need to compute the similarities for the pert layer on both the old and new signatures, as well as the structure layer.
+
+```{r}
+sens.cor <- sens.data[common.drugs, common.drugs]
+
+pert.cor.new <- cor(pert.data.new[, intersect(common.drugs, colnames(pert.data.new))], method="pearson", use="pairwise.complete.obs")
+
+pert.cor.new <- medianSimilarity(list(pert.cor.new))[[1]]
+
+strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
+rownames(strc.cor) <- names(strc.data[common.drugs])
+colnames(strc.cor) <- names(strc.data[common.drugs])
+```
+
+### Integrate Layers
+
+First, we load in the drug target info.
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+Now we create the integrated network.
+
+```{r}
+all.drugs <- common.drugs
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+
+integrated <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+```
+
+Finally, we obtain the leave one out networks.
+
+```{r}
+loo.networks <- CreateLeaveOneOutNetworks(integrated, correlation.matrices, all.drugs, data.bench)
+```
+
+### Analyze Neighbour Differences
+
+First, we get the neighbours the old fashioned way by looking at just the subnetwork od drugs with drug target info. Then we look at the full network.
+
+We want to see how many of the top 5 neighbours are in common per drug across the two methods.
+```{r}
+k <- 5
+top <- 5
+neighbours.full <- list()
+neighbours.subnet <- list()
+
+for (drug in benchmark.drugs) {
+    loo.net <- loo.networks[[drug]]
+    
+    neighbours.full[[drug]] <- GetNearestNeighbours(k, loo.net, drug)
+    neighbours.subnet[[drug]] <- GetNearestNeighbours(k, loo.net[benchmark.drugs, benchmark.drugs], drug)
+}
+```
+
+Let's determine on average how many of the top 5 neighbours are in agreement between the two methods. We'll be lenient such that order does not matter.
+
+```{r}
+intersection <- list()
+
+for (drug in names(neighbours.full)) {
+    temp <- intersect(neighbours.full[[drug]]$neighbours, neighbours.subnet[[drug]]$neighbours)
+    
+    intersection[[drug]] <- temp
+}
+
+avg.intersection <- mean(unlist(lapply(intersection, length)))
+
+cat(paste("Average overlap between methods in top 5 drugs:", avg.intersection))
+```
+
+We can also take a look at some of the worst drugs in terms of the overlap between the two methods.
+
+```{r}
+intersection.lengths <- unlist(lapply(intersection, length))
+worst.drugs <- head(sort(intersection.lengths), 10)
+
+df.data <- cbind(names(worst.drugs), worst.drugs)
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+colnames(df.data) <- c("drug", "intersection")
+df.data$intersection <- as.numeric(df.data$intersection)
+
+p <- ggplot(data=df.data, aes(x=reorder(drug, intersection), y=intersection))
+p <- p + geom_bar(stat="identity")
+p <- p + ggtitle("Top 5 Drugs in Common Between Two Methods")
+p <- p + xlab("Drug")
+p <- p + ylab("# Drugs in Common")
+p
+```
+
+Now we can see if there is significant overlap between the drugs that are misclassified by KNN, and the drugs that have the worst intersection between the two neighbours methods.
+
+```{r}
+accuracies <- numeric(length(benchmark.drugs))
+names(accuracies) <- benchmark.drugs
+
+for (drug in benchmark.drugs) {
+    loo.net <- loo.networks[[drug]]
+    
+    acc <- GetKNNAccuracySingle(k, loo.net, data.bench, drug)
+    accuracies[drug] <- acc
+}
+
+
+bad.drugs.accuracy <- accuracies[accuracies == 0]
+bad.drugs.intersection <- intersection.lengths[intersection.lengths <= 4]
+
+num.common.drugs <- length(intersect(names(bad.drugs.accuracy), names(bad.drugs.intersection)))
+
+percentage.misclassified <- num.common.drugs / length(bad.drugs.accuracy)
+
+cat(paste("Percentage of misclassified drugs in drugs that don't have complete overlap between two nearest neighbours methods:", percentage.misclassified))
+```
+
+Now let's create a bar plot showing how the percentage of misclassified drugs changes as a function of the number of neighbours in the intersection between the two methods.
+
+```{r}
+bad.drugs <- names(bad.drugs.accuracy)
+percentages <- list()
+
+for (i in 0:k) {
+    temp <- names(intersection.lengths[intersection.lengths <= i])
+    
+    overlap <- length(intersect(bad.drugs, temp))
+    percentages[[as.character(i)]] <- overlap / length(bad.drugs)
+}
+```
+
+```{r}
+percentages <- unlist(percentages)
+
+df.data <- cbind(names(percentages), percentages)
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+colnames(df.data) <- c("neighbour.intersection", "percentage")
+df.data$percentage <- as.numeric(df.data$percentage)
+
+p <- ggplot(data=df.data, aes(x=reorder(neighbour.intersection, percentage), y=percentage))
+p <- p + geom_bar(stat="identity")
+p <- p + ggtitle("Misclassification Overlap With Drugs That Have Neighbours Disagreements")
+p <- p + xlab("# of Top 5 Neighbours in Agreement")
+p <- p + ylab("Percentage")
+p
+```
+
+
+## Experiments on Combined Drug Target Dataset
+
+### Integrate Layers
+
+First, we load in the drug target info.
+
+```{r}
+data.bench <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=TRUE, use.chembl=TRUE, use.dbank=TRUE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+benchmark.drugs <- unique(data.bench$MOLECULE_NAME)
+```
+
+Now we create the integrated network.
+
+```{r}
+all.drugs <- common.drugs
+
+correlation.matrices <- list(sens=sens.cor, pert=pert.cor.new, strc=strc.cor)
+
+integrated <- IntegrateCorrelationMatrices(correlation.matrices, all.drugs)
+```
+
+Finally, we obtain the leave one out networks.
+
+```{r}
+loo.networks <- CreateLeaveOneOutNetworks(integrated, correlation.matrices, all.drugs, data.bench)
+```
+
+### Analyze Neighbour Differences
+
+First, we get the neighbours the old fashioned way by looking at just the subnetwork od drugs with drug target info. Then we look at the full network.
+
+We want to see how many of the top 5 neighbours are in common per drug across the two methods.
+```{r}
+k <- 5
+top <- 5
+neighbours.full <- list()
+neighbours.subnet <- list()
+
+for (drug in benchmark.drugs) {
+    loo.net <- loo.networks[[drug]]
+    
+    neighbours.full[[drug]] <- GetNearestNeighbours(k, loo.net, drug)
+    neighbours.subnet[[drug]] <- GetNearestNeighbours(k, loo.net[benchmark.drugs, benchmark.drugs], drug)
+}
+```
+
+Let's determine on average how many of the top 5 neighbours are in agreement between the two methods. We'll be lenient such that order does not matter.
+
+```{r}
+intersection <- list()
+
+for (drug in names(neighbours.full)) {
+    temp <- intersect(neighbours.full[[drug]]$neighbours, neighbours.subnet[[drug]]$neighbours)
+    
+    intersection[[drug]] <- temp
+}
+
+avg.intersection <- mean(unlist(lapply(intersection, length)))
+
+cat(paste("Average overlap between methods in top 5 drugs:", avg.intersection))
+```
+
+We can also take a look at some of the worst drugs in terms of the overlap between the two methods.
+
+```{r}
+intersection.lengths <- unlist(lapply(intersection, length))
+worst.drugs <- head(sort(intersection.lengths), 10)
+
+df.data <- cbind(names(worst.drugs), worst.drugs)
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+colnames(df.data) <- c("drug", "intersection")
+df.data$intersection <- as.numeric(df.data$intersection)
+
+p <- ggplot(data=df.data, aes(x=reorder(drug, intersection), y=intersection))
+p <- p + geom_bar(stat="identity")
+p <- p + ggtitle("Top 5 Drugs in Common Between Two Methods")
+p <- p + xlab("Drug")
+p <- p + ylab("# Drugs in Common")
+p
+```
+
+Now we can see if there is significant overlap between the drugs that are misclassified by KNN, and the drugs that have the worst intersection between the two neighbours methods.
+
+```{r}
+accuracies <- numeric(length(benchmark.drugs))
+names(accuracies) <- benchmark.drugs
+
+for (drug in benchmark.drugs) {
+    loo.net <- loo.networks[[drug]]
+    
+    acc <- GetKNNAccuracySingle(k, loo.net, data.bench, drug)
+    accuracies[drug] <- acc
+}
+
+
+bad.drugs.accuracy <- accuracies[accuracies == 0]
+bad.drugs.intersection <- intersection.lengths[intersection.lengths <= 4]
+
+num.common.drugs <- length(intersect(names(bad.drugs.accuracy), names(bad.drugs.intersection)))
+
+percentage.misclassified <- num.common.drugs / length(bad.drugs.accuracy)
+
+cat(paste("Percentage of misclassified drugs in drugs that don't have complete overlap between two nearest neighbours methods:", percentage.misclassified))
+```
+
+Now let's create a bar plot showing how the percentage of misclassified drugs changes as a function of the number of neighbours in the intersection between the two methods.
+
+```{r}
+bad.drugs <- names(bad.drugs.accuracy)
+percentages <- list()
+
+for (i in 0:k) {
+    temp <- names(intersection.lengths[intersection.lengths <= i])
+    
+    overlap <- length(intersect(bad.drugs, temp))
+    percentages[[as.character(i)]] <- overlap / length(bad.drugs)
+}
+```
+
+```{r}
+percentages <- unlist(percentages)
+
+df.data <- cbind(names(percentages), percentages)
+df.data <- as.data.frame(df.data, stringsAsFactors=F)
+colnames(df.data) <- c("neighbour.intersection", "percentage")
+df.data$percentage <- as.numeric(df.data$percentage)
+
+p <- ggplot(data=df.data, aes(x=reorder(neighbour.intersection, percentage), y=percentage))
+p <- p + geom_bar(stat="identity")
+p <- p + ggtitle("Misclassification Overlap With Drugs That Have Neighbours Disagreements")
+p <- p + xlab("# of Top 5 Neighbours in Agreement")
+p <- p + ylab("Percentage")
+p
+```

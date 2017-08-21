@@ -1,12 +1,7 @@
 ---
-title: "Compare Old And New Pert Signatures AUC - RV"
-output:
-  html_document: default
-  html_notebook: default
+title: "Compare Old and New Pert Signatures - CCA"
+output: html_notebook
 ---
-In this notebook, we show the performance of the vanilla model with 3 layers (where sensitivity datsets have been combined into a single matrix to increase overlap). This is essentially the new benchmark to beat in terms of auc.
-
-In order not to lose our sanity with the relative file paths that rmd chooses to employ, let's set the root directory of this project
 
 ```{r setup}
 knitr::opts_knit$set(root.dir = normalizePath('../../../'))
@@ -45,6 +40,7 @@ source("RCode/flexible_layers/stackedLayerAnalysisHelpers.R")
 source("RCode/flexible_layers/communityGenFlexible.R")
 
 source("RCode/value_inference_models/modifying_snf/snfModifiedHelpers.R")
+source("RCode/goldenberg_imputation/medianSimilarity.R")
 
 source("RCode/cindexComp2.R")
 source("RCode/predPerf.R")
@@ -66,7 +62,7 @@ library(apcluster)
 badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
 
 pert.file.name.old <- "Data/L1000_compound_signatures.RData"
-pert.file.name.new <- "Data/pert_sigs_6_hour/pert_rv_correlations.rds"
+pert.file.name.new <- "Data/pert_sigs_6_hour/pert_cca_correlations.rds"
 sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
 source("RCode/flexible_layers/stackedLayerAnalysis.R")
 ```
@@ -124,11 +120,12 @@ sens.cor <- sens.data[common.drugs, common.drugs]
 pert.cor.old <- cor(pert.data.old[, common.drugs], method="pearson", use="pairwise.complete.obs")
 pert.cor.new <- pert.data.new[common.drugs, common.drugs]
 
+pert.cor.new <- medianSimilarity(list(pert.cor.new))[[1]]
+
 strc.cor <- fingerprint::fp.sim.matrix(strc.data[common.drugs], method = "tanimoto")
 rownames(strc.cor) <- names(strc.data[common.drugs])
 colnames(strc.cor) <- names(strc.data[common.drugs])
 ```
-
 
 ## Performance Evalution
 
@@ -161,7 +158,7 @@ CompDrugTargetBenchmarkFlexible(common.drugs, "temp", affinity.matrices$strc,
 CompDrugTargetBenchmarkFlexible(common.drugs, "temp", affinity.matrices$strc,
                                     affinity.matrices$sens, affinity.matrices$pert, integrated, NULL, NULL,
                                     "target.roc.file.name", use.ctrpv2=T,
-                                    use.clue=T, use.chembl=T, use.dbank=F, use.dtc=F)
+                                    use.clue=T, use.chembl=T, use.dbank=T, use.dtc=F)
 ```
 
 ### New Signatures 
@@ -195,3 +192,4 @@ CompDrugTargetBenchmarkFlexible(common.drugs, "temp", affinity.matrices$strc,
                                     "target.roc.file.name", use.ctrpv2=T,
                                     use.clue=T, use.chembl=T, use.dbank=F, use.dtc=F)
 ```
+

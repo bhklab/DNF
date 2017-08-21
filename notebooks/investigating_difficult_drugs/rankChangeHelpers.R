@@ -58,3 +58,27 @@ CalculateRankChangesSpecific <- function(neighbours.1, neighbours.2, k) {
                 mean.positive.change=mean.positive.change,
                 mean.negative.change=mean.negative.change))
 }
+
+CalculateNeighbourIntersection <- function(neighbours.1, neighbours.2) {
+    overlap.total <- matrix(NA, nrow=nrow(neighbours.1), ncol=ncol(neighbours.1))
+    overlap.percentage <- matrix(NA, nrow=nrow(neighbours.1), ncol=ncol(neighbours.1))
+    rownames(overlap.total) <- rownames(neighbours.1)
+    rownames(overlap.percentage) <- rownames(neighbours.1)
+    
+    for (drug in rownames(neighbours.1)) {
+        
+        for (k in 1:ncol(neighbours.1)) {
+            n.1 <- neighbours.1[drug, 1:k]
+            n.2 <- neighbours.2[drug, 1:k]
+            
+            temp <- length(intersect(n.1, n.2))
+            overlap.total[drug, k] <- temp
+            overlap.percentage[drug, k] <- temp / k
+        }
+    }
+    
+    overlap.total.mean <- colMeans(overlap.total)
+    overlap.percentage.mean <- colMeans(overlap.percentage)
+    
+    return(list(overlap.total.mean=overlap.total.mean, overlap.percentage.mean=overlap.percentage.mean))
+}
