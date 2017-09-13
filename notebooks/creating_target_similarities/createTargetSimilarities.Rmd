@@ -1,0 +1,126 @@
+---
+title: "Create Target Similarity Matrix"
+output: html_notebook
+---
+## Description
+
+This notebook shows the creation of the target similarity matrix. First, the targets are converted into kegg identifiers, then the corresponding amino acide sequences are obtained from the kegg genes database, and finally the pairwiseAlignment function is used to measure the target similarity and create a similarity matrix.
+
+```{r setup}
+knitr::opts_knit$set(root.dir = normalizePath("../../"))
+```
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+library(doParallel)
+library(foreach)
+library(Biostrings)
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/target_similarity/targetSimilarityHelpers.R")
+source("RCode/knn/drugTargetsKNN.R")
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+```
+
+## Code
+
+### Obtain the Drug Names for All Drugs in the Sensitivity Layer
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)
+
+drug.names <- rownames(sens.data)
+```
+
+### Obtain the Targets for the Sensitvity Drugs
+
+```{r}
+data.bench <- DrugTargetsKNN(drug.names, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=TRUE, use.chembl=TRUE, use.dbank=TRUE, use.dtc=FALSE)
+data.bench[] <- lapply(data.bench, as.character)
+targets <- sort(unique(data.bench$TARGET_NAME))
+
+targets <- trimws(targets, which="both")
+```
+
+### Convert Targets Into KEGG Identifiers 
+
+```{r}
+kegg.identifiers <- KEGGREST::keggList("hsa")
+kegg.identifiers <- kegg.identifiers[-(grep("uncharacterized", kegg.identifiers))]
+
+
+identifiers.with.dupes <- GetKeggIdentifiersForGenes(kegg.identifiers, targets)
+identifiers <- identifiers.with.dupes[!duplicated(identifiers.with.dupes)]
+```
+
+### Obtain Amino Acid Sequences for KEGG Identifiers
+
+```{r}
+res <- GetAminoAcidSequencesSlow(identifiers)
+
+aa.sequences <- list()
+
+for (i in 1:length(res)) {
+    temp <- res[[i]]
+    
+    targets.of.interest <- names(identifiers.with.dupes[identifiers.with.dupes == identifiers[i]])
+    
+    for (j in 1:length(targets.of.interest)) {
+        aa.sequences[[targets.of.interest[j]]] <- as.character(temp[[1]])    
+    }
+    
+    
+}
+```
+
+### Compute Similarities Between Amino Acid Sequences
+
+```{r}
+target.similarities <- matrix(0, nrow=length(aa.sequences), ncol=length(aa.sequences))
+
+for (i in 1:(length(aa.sequences) - 1)) {
+    s1 <- aa.sequences[[i]]
+    
+    for (j in (i + 1):length(aa.sequences)) {
+        s2 <- aa.sequences[[j]]
+        
+        target.similarities[i, j] <- NormalizedSW(s1, s2)
+    }
+}
+
+diag(target.similarities) <- 1
+temp <- target.similarities
+temp[lower.tri(temp)] <- t(temp)[lower.tri(temp)]
+
+target.similarities <- temp
+rownames(target.similarities) <- names(aa.sequences)
+colnames(target.similarities) <- names(aa.sequences)
+```
+
+```{r}
+c1 <- makeCluster(8, outfile="")
+registerDoParallel(c1)
+
+similarity.matrix <- foreach(i=1:(length(aa.sequences) - 1), 
+                              .packages=c("Biostrings", "foreach")) %dopar% { 
+    foreach (j=(i+1):length(aa.sequences), .combine="c", .packages=c("Biostrings", "foreach")) %do% {
+        require(foreach)
+        d1 <- names(aa.sequences)[i]
+        d2 <- names(aa.sequences)[j]
+        
+        s1 <- aa.sequences[[d1]]
+        s2 <- aa.sequences[[d2]]
+        
+        temp <- pairwiseAlignment(s1, s2)
+        names(temp) <- d2
+        temp
+    }
+}
+```
+
+

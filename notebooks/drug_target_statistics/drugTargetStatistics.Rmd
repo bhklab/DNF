@@ -1,0 +1,221 @@
+---
+title: "Drug Target Dataset Statistics"
+output: html_notebook
+---
+
+## Description
+
+This notebook creates a plot showing the number of drugs, and targets per drug target dataset. The plot also shows the average number of targets per drug for each dataset.
+
+```{r setup}
+knitr::opts_knit$set(root.dir = normalizePath("../../"))
+```
+
+## Code
+
+```{r warning=FALSE, message=FALSE}
+library(extrafont)
+extrafont::loadfonts(device="win")
+library(ggplot2)
+library(reshape2)
+
+source("RCode/knn/drugTargetsKNN.R")
+source("RCode/flexible_layers/drugTargetBenchFlexible.R")
+source("RCode/flexible_layers/sensitivityDataFlexible.R")
+
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+
+```
+
+Load in the LINCS metadata to determine the common drugs between the sensitivity layer and the perturbation layer.
+
+```{r}
+lincs.meta <- read.csv("Data/LINCS.csv", stringsAsFactors = FALSE)
+lincs.meta$pert_iname <- toupper(lincs.meta$pert_iname)
+lincs.meta$pert_iname <- gsub(badchars, "", lincs.meta$pert_iname)
+```
+
+Now to load in the sensitivity layer
+
+```{r}
+sensitivity.file.name <- "Data/combined_sensitivity//combined_sens_iname_replaced.RData"
+
+sens.data <- SensitivityDataFlexible(sensitivity.file.name)  ## 645 X 239
+```
+
+```{r}
+common.drugs <- intersect(rownames(sens.data), lincs.meta$pert_iname)
+```
+
+```{r}
+ctrpv2.targets <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=TRUE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+ctrpv2.targets[] <- lapply(ctrpv2.targets, as.character)
+
+ctrpv2.targets$TARGET_NAME <- trimws(ctrpv2.targets$TARGET_NAME)
+```
+
+```{r}
+chembl.targets <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=FALSE,
+                        use.clue=FALSE, use.chembl=TRUE, use.dbank=FALSE, use.dtc=FALSE)
+
+chembl.targets[] <- lapply(chembl.targets, as.character)
+
+chembl.targets$TARGET_NAME <- trimws(chembl.targets$TARGET_NAME)
+```
+
+```{r}
+clue.targets <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=FALSE,
+                        use.clue=TRUE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE)
+
+clue.targets[] <- lapply(clue.targets, as.character)
+
+clue.targets$TARGET_NAME <- trimws(clue.targets$TARGET_NAME)
+```
+
+```{r}
+drugbank.targets <- DrugTargetsKNN(common.drugs, gmt_file_name="temp", use.ctrpv2=FALSE,
+                        use.clue=FALSE, use.chembl=FALSE, use.dbank=TRUE, use.dtc=FALSE)
+
+drugbank.targets[] <- lapply(drugbank.targets, as.character)
+
+drugbank.targets$TARGET_NAME <- trimws(drugbank.targets$TARGET_NAME)
+```
+
+### Compute Statistics for Drug Target Datasets
+
+```{r}
+target.datasets <- list(ctrpv2=ctrpv2.targets, chembl=chembl.targets, clue=clue.targets, drugbank=drugbank.targets)
+
+stats.num.drugs <- list()
+stats.num.targets <- list()
+stats.avg.targets.per.drug <- list()
+stats.distribution.of.targets <- list()
+stats.targets.per.drug <- list()
+stats.drugs.per.target <- list()
+
+for (dataset in names(target.datasets)) {
+    df <- target.datasets[[dataset]]
+    
+    num.drugs <- length(unique(df$MOLECULE_NAME))
+    num.targets <- length(unique(df$TARGET_NAME))
+    
+    targets.per.drug <- vapply(unique(df$MOLECULE_NAME), function(x) {
+        nrow(df[df$MOLECULE_NAME == x,])
+    }, numeric(1))
+    
+    avg.targets.per.drug <- mean(targets.per.drug)
+    distribution.of.targets <- summary(targets.per.drug)
+    
+    drugs.per.target <- vapply(unique(df$TARGET_NAME), function(x) {
+        nrow(df[df$TARGET_NAME == x, ])
+    }, numeric(1))
+    
+    stats.num.drugs[[dataset]] <- num.drugs
+    stats.num.targets[[dataset]] <- num.targets
+    stats.avg.targets.per.drug[[dataset]] <- avg.targets.per.drug
+    stats.distribution.of.targets[[dataset]] <- distribution.of.targets
+    stats.targets.per.drug[[dataset]] <- targets.per.drug
+    stats.drugs.per.target[[dataset]] <- drugs.per.target
+}
+```
+
+### Create Dataframe for Barplot
+
+```{r}
+stats.num.drugs <- unlist(stats.num.drugs)
+stats.num.targets <- unlist(stats.num.targets)
+dataset.names <- names(stats.num.targets)
+
+df <- data.frame(datasets=dataset.names, num.drugs=stats.num.drugs, num.targets=stats.num.targets)
+
+df <- melt(df)
+df$order <- stats.num.targets
+```
+
+### Create Barplot
+
+```{r}
+p <- ggplot(data=df, aes(x=reorder(datasets, order)))
+p <- p +  labs(title = "Temperatures\n", x = "TY [°C]", y = "Txxx", color = NULL)
+p <- p + scale_x_discrete(name="Dataset", labels=c("ChEMBL", "Drugbank", "CTRPv2", "Drug Repurposing"))
+p <- p + scale_fill_discrete(name = "Count", labels = c("Drugs per Dataset", "Targets Per Dataset"))
+p <- p + geom_bar(data=df, stat="identity", aes(y=value, fill=variable), position="dodge")
+p <- p + ggtitle("Sensitivity Dataset Statistics")
+p <- p + xlab("Dataset")
+p <- p + ylab("Count")
+p <- p + theme(axis.text.y = element_text(size=16),
+               axis.title=element_text(size=20),
+               plot.title = element_text(size=26),
+               aspect.ratio=1)
+p
+ggsave("drug_target_statistics.tiff", dpi=120)
+```
+
+### Create Dataframe for Targets Per Drug Boxplot
+
+```{r}
+stats.targets.per.drug <- unlist(stats.targets.per.drug)
+
+temp <- strsplit(names(stats.targets.per.drug), split="[.]")
+temp <- lapply(temp, function(x) {
+    x[1]
+})
+temp <- unlist(temp)
+
+df <- data.frame(datasets=temp, targets.per.drug=stats.targets.per.drug)
+```
+
+### Create Boxplot for Targets Per Drug
+
+```{r}
+p <- ggplot(data=df, aes(x=datasets))
+p <- p + geom_boxplot(aes(y=targets.per.drug, fill=datasets))
+p <- p + ggtitle("Distribution of Targets per Drug")
+p <- p + xlab("Dataset")
+p <- p + ylab("Targets per Drug")
+p <- p + scale_fill_discrete(name="Datasets", labels=c("ChEMBL", "Drug Repurposing", "CTRPv2", "Drugbank"))
+p <- p + theme(axis.text.y = element_text(size=16),
+    axis.title=element_text(size=20),
+               plot.title = element_text(size=26),
+               aspect.ratio=1)
+p <- p + scale_x_discrete(name="Datasets", labels=c("ChEMBL", "Drug Repurposing", "CTRPv2", "Drugbank"))
+p <- p + scale_y_continuous(name="Targets per Drug", breaks = 2 * seq(1, 8))
+p
+ggsave(filename = "targets_per_drug.tiff", dpi=120)
+```
+
+### Create Dataframe for Drugs per Target Boxplot
+
+The next logical thing to take a look at is the distribution of the number of drugs per target
+
+```{r}
+stats.drugs.per.target <- unlist(stats.drugs.per.target)
+
+temp <- strsplit(names(stats.drugs.per.target), split="[.]")
+temp <- lapply(temp, function(x) {
+    x[1]
+})
+temp <- unlist(temp)
+
+df <- data.frame(datasets=temp, drugs.per.target=stats.drugs.per.target)
+```
+
+```{r}
+p <- ggplot(data=df, aes(x=datasets))
+p <- p + geom_boxplot(aes(y=drugs.per.target, fill=datasets))
+p <- p + ggtitle("Distribution of Drugs Per Target")
+p <- p + xlab("Dataset")
+p <- p + ylab("Drugs per Target")
+p <- p + theme(axis.text.y = element_text(size=16),
+    axis.title=element_text(size=20),
+               plot.title = element_text(size=26),
+               aspect.ratio=1)
+p
+# ggsave(filename = "targets_per_drug.tiff", dpi=300)
+```
+
+
+
+

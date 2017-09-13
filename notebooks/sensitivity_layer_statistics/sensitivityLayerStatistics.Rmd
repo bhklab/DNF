@@ -1,0 +1,119 @@
+---
+title: "Sensitivity Data Statistics"
+output: html_notebook
+---
+
+## Description
+
+This notebook includes code for generating plots that summarize the various sensitivity experiments used in the sensitivity layer.
+
+```{r setup}
+knitr::opts_knit$set(root.dir = normalizePath("../../"))
+```
+
+## Code
+
+```{r warning=FALSE, message=FALSE}
+library(ggplot2)
+library(reshape2)
+load("PSets/CCLE_hs.RData")
+load("PSets/gCSI_hs.RData")
+load("PSets/CTRPv2.RData")
+load("PSets/GDSC1000.RData")
+load("PSets/FIMM.RData")
+
+badchars <- "[\xb5]|[\n]|[,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+
+datasets <- list(CCLE=CCLE, gCSI=gCSI, GDSC1000=GDSC1000, CTRPv2=CTRPv2, FIMM=FIMM)
+```
+
+### Determine Number of Drugs Per Dataset
+
+```{r}
+drugs.per.dataset <- list()
+drug.names.per.dataset <- list()
+
+for (dataset in names(datasets)) {
+    pset = datasets[[dataset]]
+    
+    drug.names <- drugNames(pset)
+    combos.removed <- drug.names[!grepl(":", drug.names)]
+    
+    drugs.per.dataset[[dataset]] <- length(unique(combos.removed))
+    drug.names.per.dataset[[dataset]] <- gsub(badchars, "",toupper(combos.removed))
+}
+```
+
+### Determine Average Number of Cell Lines Per Drug Per Dataset
+
+```{r}
+average.cell.lines <- list()
+
+for (dataset in names(datasets)) {
+    pset = datasets[[dataset]]
+    
+    aucs <- summarizeSensitivityProfiles(pSet = pset, sensitivity.measure = "auc_recomputed")
+    
+    counts <- apply(aucs, 1, function(x) {
+        sum(!is.na(x))
+    })
+    
+    average.cell.lines[[dataset]] <- mean(counts)
+}
+```
+
+### Determine Cumulative Drugs as More Datasets Are Used
+
+```{r}
+cumulative.drugs.per.dataset <- list()
+sorted.order <- names(sort(unlist(lapply(drug.names.per.dataset, function(x) {
+    length(unique(x))
+})), decreasing = F))
+
+running.total <- c()
+
+for (dataset in sorted.order) {
+    running.total <- union(running.total, drug.names.per.dataset[[dataset]])
+    
+    cumulative.drugs.per.dataset[[dataset]] <- length(unique(running.total))
+}
+
+cumulative.drugs.per.dataset <- unlist(cumulative.drugs.per.dataset)
+cumulative.drugs.per.dataset <- cumulative.drugs.per.dataset[names(drugs.per.dataset)]
+```
+
+
+### Convert Data into Dataframe for ggplot2
+
+```{r}
+dataset.names <- names(drugs.per.dataset)
+drugs.per.dataset <- unlist(drugs.per.dataset)
+average.cell.lines <- unlist(average.cell.lines)
+
+
+df <- data.frame(datasets = dataset.names, drugs.per.dataset = drugs.per.dataset, average.cell.lines = average.cell.lines)
+
+df <- melt(df)
+df$order <- drugs.per.dataset
+df$cumulative <- cumulative.drugs.per.dataset
+```
+
+```{r, dpi=600}
+tiff("Plot3.tiff", width = 8, height = 4, units = 'in', res = 275)
+p <- ggplot(data=df, aes(x=reorder(datasets, order)))
+p <- p +  labs(title = "Temperatures\n", x = "TY [°C]", y = "Txxx", color = NULL)
+p <- p + scale_fill_discrete(name = "Count", labels = c("Drugs per Dataset", "Avg Cell Lines per Dataset"))
+p <- p + scale_color_manual(name = "Cumulative", labels = c("Drugs per Dataset"), values = c("#f39c12"))
+p <- p + geom_bar(data=df, stat="identity", aes(y=value, fill=variable), position="dodge")
+p <- p + geom_line(aes(y=cumulative, group=1, color="A"), size=1.5)
+p <- p + geom_point(aes(y=cumulative, color="A"), size=2.5)
+p <- p + ggtitle("Sensitivity Dataset Statistics")
+p <- p + xlab("Dataset")
+p <- p + ylab("Count")
+p <- p + theme(axis.title=element_text(size=14),
+               plot.title = element_text(size=32))
+# p <- p + geom_text()
+p
+dev.off()
+```
+
