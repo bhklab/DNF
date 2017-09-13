@@ -2,7 +2,7 @@
 ## Function reads in the benchmark sets and filter them out according to the intersection of the input datasets
 ## 
 ## input: 
-##     cdrugs: a vector of common drugs between the input datasets
+##     common.drugs: a vector of common drugs between the input datasets
 ## output: 
 ##        a drug x drug adjacency/similarity matrix
 ##
@@ -10,10 +10,10 @@
 ###############################################################################################################
 
 
-DrugTargetBenchFlexible <- function(cdrugs, gmt_file_name="communities_flexible", use.ctrpv2=FALSE,
+DrugTargetBenchFlexible <- function(common.drugs, gmt_file_name="communities_flexible", use.ctrpv2=FALSE,
                                   use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
     
-    drug.targets <- GetDrugTargetsFromDatasets(cdrugs=cdrugs, use.ctrpv2=use.ctrpv2, use.clue=use.clue,
+    drug.targets <- GetDrugTargetsFromDatasets(common.drugs=common.drugs, use.ctrpv2=use.ctrpv2, use.clue=use.clue,
                                                use.chembl=use.chembl, use.dbank=use.dbank,
                                                use.dtc=use.dtc)
     
@@ -49,7 +49,7 @@ DrugTargetBenchFlexible <- function(cdrugs, gmt_file_name="communities_flexible"
     return(data.bench)
 }
 
-GetDrugTargetsFromDatasets <- function(cdrugs, use.ctrpv2=FALSE,
+GetDrugTargetsFromDatasets <- function(common.drugs, use.ctrpv2=FALSE,
                                 use.clue=FALSE, use.chembl=FALSE, use.dbank=FALSE, use.dtc=FALSE) {
     drug.targets = data.frame(MOLECULE_NAME=character(0), TARGET_NAME=character(0), stringsAsFactors = F)
     
@@ -59,7 +59,7 @@ GetDrugTargetsFromDatasets <- function(cdrugs, use.ctrpv2=FALSE,
         ctrp.drug.targs$compound_name <- toupper(ctrp.drug.targs$compound_name)
         ctrp.drug.targs$compound_name <- gsub(badchars,"",ctrp.drug.targs$compound_name)
         ## 
-        ctrp.drug.targs <- ctrp.drug.targs[ctrp.drug.targs$compound_name %in% cdrugs,,drop=F] 
+        ctrp.drug.targs <- ctrp.drug.targs[ctrp.drug.targs$compound_name %in% common.drugs,,drop=F] 
         ctrp.drug.targs <- ctrp.drug.targs[,c(1,2)] 
         colnames(ctrp.drug.targs)[1:2] <- c("MOLECULE_NAME","TARGET_NAME")
         ## split to get unique targets 
@@ -75,7 +75,7 @@ GetDrugTargetsFromDatasets <- function(cdrugs, use.ctrpv2=FALSE,
     if (use.chembl) {
         ## read CHEMBL drug file downloaded from Chembl website
         chembl.drug.targs <- read.csv("Data/target_datasets_processed/chembl_drug_targets.csv", stringsAsFactors=F)
-        chembl.drug.targs <- chembl.drug.targs[chembl.drug.targs$MOLECULE_NAME %in% cdrugs,]
+        chembl.drug.targs <- chembl.drug.targs[chembl.drug.targs$MOLECULE_NAME %in% common.drugs,]
         
         drug.targets <- rbind.data.frame(drug.targets, chembl.drug.targs, stringsAsFactors = FALSE)
     }
@@ -83,7 +83,7 @@ GetDrugTargetsFromDatasets <- function(cdrugs, use.ctrpv2=FALSE,
     if (use.dbank) {
         ## Drug bank targets
         uniprot.targs <- read.csv("Data/target_datasets_processed/drug_bank_targets.csv", stringsAsFactors=F)
-        uniprot.targs <- uniprot.targs[uniprot.targs[,1] %in% cdrugs,]
+        uniprot.targs <- uniprot.targs[uniprot.targs[,1] %in% common.drugs,]
         
         drug.targets <- rbind.data.frame(drug.targets, uniprot.targs, stringsAsFactors = FALSE)
     }
@@ -109,7 +109,7 @@ GetDrugTargetsFromDatasets <- function(cdrugs, use.ctrpv2=FALSE,
         clue.io.targets$MOLECULE_NAME <- toupper(clue.io.targets$MOLECULE_NAME)
         clue.io.targets$MOLECULE_NAME <- gsub(badchars, "", clue.io.targets$MOLECULE_NAME)
         
-        clue.io.targets <- clue.io.targets[clue.io.targets$MOLECULE_NAME %in% cdrugs, ]
+        clue.io.targets <- clue.io.targets[clue.io.targets$MOLECULE_NAME %in% common.drugs, ]
         
         clue.targets <- strsplit(clue.io.targets$TARGET_NAME, split="|", fixed=TRUE)
         clue.targets <- data.frame(MOLECULE_NAME = rep(clue.io.targets$MOLECULE_NAME,
@@ -124,7 +124,7 @@ GetDrugTargetsFromDatasets <- function(cdrugs, use.ctrpv2=FALSE,
         dtc.targs <- read.csv("Data/dtcTargets.csv", stringsAsFactors = FALSE)
         colnames(dtc.targs) <-  c("MOLECULE_NAME","TARGET_NAME")
         
-        drug.targetsAdditional <- dtc.targs[dtc.targs[,1] %in% cdrugs,]
+        drug.targetsAdditional <- dtc.targs[dtc.targs[,1] %in% common.drugs,]
         
         drug.targets <- rbind.data.frame(drug.targets, drug.targetsAdditional, stringsAsFactors = FALSE)
     }
