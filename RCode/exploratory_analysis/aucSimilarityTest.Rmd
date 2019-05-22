@@ -1,0 +1,72 @@
+---
+title: "AUC Similarity Exploration"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+```{r setup}
+knitr::opts_knit$set(root.dir = 'C:/Users/alexp/Documents/research/summer_2017/DNF')
+```
+
+# Loading necessary functions
+
+```{r}
+library(compiler)
+library(ROCR)
+source("RCode/temp/computeCIndex.R")
+
+ComputeCIndexCompiled <- cmpfun(ComputeCIndex)
+FindBadPerformersCompiled <- cmpfun(FindBadPerformers)
+RandomGuessingCompiled <- cmpfun(RandomGuessing)
+```
+
+# Loading Data
+
+Now to load the benchmark and integrated network values
+
+```{r}
+pairs <- readRDS("pairs.RData")
+
+x <- pairs$integrPairs$obs.integr
+y <- pairs$benchPairs$bench
+```
+
+# Determining Good and Bad Performers
+
+We now determine which pairs of drugs are responsible for good and bad performance
+
+```{r}
+res <- FindBadPerformersCompiled(x, y)
+bad.performers <- res$bad.performers
+false.positives <- res$false.positives
+false.negatives <- res$false.negatives
+true.positives <- res$true.positives
+true.negatives <- res$true.negatives
+```
+
+# Analyze True Positive Statistical Significance
+
+So now that we have information about which pairs gave us the highest amount of true positives classifications when computing AUC, let's look to see if there is anything special about these pairs. In this example, we want to see if the corresponding integrated network similarities for these pairs is significantly higher than the pairs which did not give many true positives. If so, this suggests that similarities are doing their job since we expect drugs that are very similar to share a drug target.
+
+
+```{r}
+names(true.positives) <- paste(pairs$integrPairs$Var1, pairs$integrPairs$Var2, sep=":")
+filtered.true.positives <- true.positives[true.positives > 0]
+high.indices <- which(true.positives > quantile(filtered.true.positives, 0.5))
+low.indices <- which(true.positives < quantile(filtered.true.positives, 0.5) & true.positives != 0)
+
+wilcox.test(x[high.indices], x[low.indices], alternative="greater")
+summary(x[high.indices])
+summary(x[low.indices])
+```
+
+The above output is clear evidence that the pairs of drugs responsible for a large amount of true positives have larger similarity measures than the pairs of drugs that are responsible for less true positives
+
+# Analyze Fa
