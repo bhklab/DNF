@@ -59,7 +59,12 @@ GetDrugTargetsFromDatasets <- function(common.drugs, use.ctrpv2=FALSE,
         ctrp.drug.targs$compound_name <- toupper(ctrp.drug.targs$compound_name)
         ctrp.drug.targs$compound_name <- gsub(badchars,"",ctrp.drug.targs$compound_name)
         ## 
-        ctrp.drug.targs <- ctrp.drug.targs[ctrp.drug.targs$compound_name %in% common.drugs,,drop=F] 
+        if (length(common.drugs) == 0) {
+            print("Did not subset drug target dataset to common drugs. Retrieving data for all drugs")
+        } else {
+            ctrp.drug.targs <- ctrp.drug.targs[ctrp.drug.targs$compound_name %in% common.drugs,,drop=F]             
+        }
+        
         ctrp.drug.targs <- ctrp.drug.targs[,c(1,2)] 
         colnames(ctrp.drug.targs)[1:2] <- c("MOLECULE_NAME","TARGET_NAME")
         ## split to get unique targets 
@@ -75,7 +80,12 @@ GetDrugTargetsFromDatasets <- function(common.drugs, use.ctrpv2=FALSE,
     if (use.chembl) {
         ## read CHEMBL drug file downloaded from Chembl website
         chembl.drug.targs <- read.csv("Data/target_datasets_processed/chembl_drug_targets.csv", stringsAsFactors=F)
-        chembl.drug.targs <- chembl.drug.targs[chembl.drug.targs$MOLECULE_NAME %in% common.drugs,]
+        
+        if (length(common.drugs) == 0) {
+            print("Did not subset drug target dataset to common drugs. Retrieving data for all drugs")
+        } else {
+            chembl.drug.targs <- chembl.drug.targs[chembl.drug.targs$MOLECULE_NAME %in% common.drugs,]    
+        }
         
         drug.targets <- rbind.data.frame(drug.targets, chembl.drug.targs, stringsAsFactors = FALSE)
     }
@@ -83,7 +93,12 @@ GetDrugTargetsFromDatasets <- function(common.drugs, use.ctrpv2=FALSE,
     if (use.dbank) {
         ## Drug bank targets
         uniprot.targs <- read.csv("Data/target_datasets_processed/drug_bank_targets.csv", stringsAsFactors=F)
-        uniprot.targs <- uniprot.targs[uniprot.targs[,1] %in% common.drugs,]
+        
+        if (length(common.drugs) == 0) {
+            print("Did not subset drug target dataset to common drugs. Retrieving data for all drugs")
+        } else {
+            uniprot.targs <- uniprot.targs[uniprot.targs[,1] %in% common.drugs,]    
+        }
         
         drug.targets <- rbind.data.frame(drug.targets, uniprot.targs, stringsAsFactors = FALSE)
     }
@@ -109,7 +124,11 @@ GetDrugTargetsFromDatasets <- function(common.drugs, use.ctrpv2=FALSE,
         clue.io.targets$MOLECULE_NAME <- toupper(clue.io.targets$MOLECULE_NAME)
         clue.io.targets$MOLECULE_NAME <- gsub(badchars, "", clue.io.targets$MOLECULE_NAME)
         
-        clue.io.targets <- clue.io.targets[clue.io.targets$MOLECULE_NAME %in% common.drugs, ]
+        if (length(common.drugs) == 0) {
+            print("Did not subset drug target dataset to common drugs. Retrieving data for all drugs")
+        } else {
+            clue.io.targets <- clue.io.targets[clue.io.targets$MOLECULE_NAME %in% common.drugs, ]    
+        }
         
         clue.targets <- strsplit(clue.io.targets$TARGET_NAME, split="|", fixed=TRUE)
         clue.targets <- data.frame(MOLECULE_NAME = rep(clue.io.targets$MOLECULE_NAME,
@@ -124,7 +143,12 @@ GetDrugTargetsFromDatasets <- function(common.drugs, use.ctrpv2=FALSE,
         dtc.targs <- read.csv("Data/dtcTargets.csv", stringsAsFactors = FALSE)
         colnames(dtc.targs) <-  c("MOLECULE_NAME","TARGET_NAME")
         
-        drug.targetsAdditional <- dtc.targs[dtc.targs[,1] %in% common.drugs,]
+        if (length(common.drugs) == 0) {
+            print("Did not subset drug target dataset to common drugs. Retrieving data for all drugs")
+            drug.targetsAdditional <- dtc.targs
+        } else {
+            drug.targetsAdditional <- dtc.targs[dtc.targs[,1] %in% common.drugs,]    
+        }
         
         drug.targets <- rbind.data.frame(drug.targets, drug.targetsAdditional, stringsAsFactors = FALSE)
     }

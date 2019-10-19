@@ -249,7 +249,7 @@ colnames(df.data) <- c("neighbour.intersection", "percentage")
 df.data$percentage <- as.numeric(df.data$percentage)
 
 p <- ggplot(data=df.data, aes(x=reorder(neighbour.intersection, percentage), y=percentage))
-p <- p + geom_bar(stat="identity")
+p <- p + geom_bar(stat="identity", fill="#00BFC4")
 p <- p + ggtitle("Misclassification Overlap With Drugs That Have Neighbours Disagreements")
 p <- p + xlab("# of Top 5 Neighbours in Agreement")
 p <- p + ylab("Percentage")
@@ -370,7 +370,7 @@ Now let's create a bar plot showing how the percentage of misclassified drugs ch
 bad.drugs <- names(bad.drugs.accuracy)
 percentages <- list()
 
-for (i in 0:k) {
+for (i in 1:(k-1)) {
     temp <- names(intersection.lengths[intersection.lengths <= i])
     
     overlap <- length(intersect(bad.drugs, temp))
@@ -387,9 +387,10 @@ colnames(df.data) <- c("neighbour.intersection", "percentage")
 df.data$percentage <- as.numeric(df.data$percentage)
 
 p <- ggplot(data=df.data, aes(x=reorder(neighbour.intersection, percentage), y=percentage))
-p <- p + geom_bar(stat="identity")
+p <- p + geom_bar(stat="identity", fill="#00BFC4")
 p <- p + ggtitle("Misclassification Overlap With Drugs That Have Neighbours Disagreements")
 p <- p + xlab("# of Top 5 Neighbours in Agreement")
 p <- p + ylab("Percentage")
 p
+ggsave("errors_explained.png", dpi=300)
 ```
